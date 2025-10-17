@@ -14,7 +14,7 @@ export default function TourManagement() {
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const toursPerPage = 10;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [tourToDelete, setTourToDelete] = useState<{
     id: string;
@@ -26,30 +26,63 @@ export default function TourManagement() {
   const [editingTour, setEditingTour] = useState<any>(null);
   const [showEditTourPopup, setShowEditTourPopup] = useState(false);
 
-  // Fetch tours from API
-  const fetchTours = async (page = 1, appendToList = false) => {
+  // Fetch tours from API - COPY EXACT LOGIC FROM page.tsx
+  const fetchTours = async () => {
     try {
-      if (page === 1) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
+      setLoading(true);
+      console.log(
+        `🔍 Admin fetching page ${currentPage} with limit ${toursPerPage}`
+      );
 
-      const data = await tourServices.fetchAllTours(page, 5);
+      const response = await tourServices.fetchAllTours(
+        currentPage,
+        toursPerPage
+      );
+      console.log("📥 Admin API Response:", response);
 
-      if (!data || !data.data) {
+      if (!response || !response.data) {
         throw new Error("Không thể tải danh sách tour");
       }
 
-      console.log("🔍 Raw API data:", data.data.tours);
+      // Handle the actual API structure: response.data.tours - SAME AS page.tsx
+      let toursData = response?.data?.tours || response?.tours || [];
+      console.log(`📊 Admin tours received: ${toursData.length} tours`);
 
-      const transformedTours = data.data.tours.map((tour: any) => {
-        console.log(
-          `📋 Tour: "${tour.tour_name}" - Image URL:`,
-          tour.image_url || "KHÔNG CÓ ẢNH"
-        );
+      // If backend doesn't handle pagination properly, do it on frontend - SAME AS page.tsx
+      const totalToursFromAPI = toursData.length;
+      const totalResults =
+        response?.total_results ||
+        response?.data?.total_results ||
+        totalToursFromAPI;
+
+      // Sort tours by creation date (newest first) if available - SAME AS page.tsx
+      if (toursData.length > 0) {
+        toursData = toursData.sort((a: any, b: any) => {
+          // Assuming tours have a created_at or similar field
+          const dateA = new Date(a.created_at || a.tour_id || 0);
+          const dateB = new Date(b.created_at || b.tour_id || 0);
+          return dateB.getTime() - dateA.getTime(); // Newest first
+        });
+
+        // If API returns all tours, slice to show only current page - SAME AS page.tsx
+        if (totalToursFromAPI > toursPerPage) {
+          const startIndex = (currentPage - 1) * toursPerPage;
+          const endIndex = startIndex + toursPerPage;
+          toursData = toursData.slice(startIndex, endIndex);
+          console.log(
+            `✂️ Admin sliced to show tours ${startIndex + 1}-${Math.min(
+              endIndex,
+              totalToursFromAPI
+            )}`
+          );
+        }
+      }
+
+      // Transform tours for admin display - MODIFIED for admin
+      const transformedTours = toursData.map((tour: any) => {
         return {
-          id: tour.id || `tour_${Math.random().toString(36).substr(2, 9)}`,
+          id: tour.tour_id || `tour_${Math.random().toString(36).substr(2, 9)}`,
+          tour_id: tour.tour_id,
           tour_name: tour.tour_name,
           days: tour.days,
           description: tour.description,
@@ -64,7 +97,6 @@ export default function TourManagement() {
           visa_prices: tour.visa_prices || [],
           price_by_packages: tour.price_by_packages || [],
           price_by_dates: tour.price_by_dates || [],
-          // Computed fields for display
           price: getDisplayPrice(tour),
           duration: `${tour.days} ngày ${tour.days - 1} đêm`,
           departureDate: getNextDepartureDate(tour.departure_schedules),
@@ -72,20 +104,20 @@ export default function TourManagement() {
         };
       });
 
-      if (appendToList) {
-        setTours((prevTours) => [...prevTours, ...transformedTours]);
-      } else {
-        setTours(transformedTours);
-      }
+      console.log(
+        `📋 Final admin tours to display: ${transformedTours.length} tours`
+      );
+      console.log(`🎯 Admin total results: ${totalResults}`);
 
-      setTotalResults(data.total_results);
-      setCurrentPage(page);
+      setTours(transformedTours);
+      setTotalResults(totalResults);
     } catch (error: any) {
-      console.error("Error fetching tours:", error);
-      setError(error.message || "Lỗi khi tải danh sách tour");
+      console.error("Admin error fetching tours:", error);
+      setError(
+        error.message || "Không thể tải danh sách tour. Vui lòng thử lại sau."
+      );
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
@@ -120,15 +152,6 @@ export default function TourManagement() {
       return date.toLocaleDateString("vi-VN");
     }
     return "Liên hệ";
-  };
-
-  // Load more tours
-  const loadMoreTours = () => {
-    const nextPage = currentPage + 1;
-    const maxPage = Math.ceil(totalResults / 5);
-    if (nextPage <= maxPage) {
-      fetchTours(nextPage, true);
-    }
   };
 
   // Show tour details
@@ -188,9 +211,10 @@ export default function TourManagement() {
     setTourToDelete(null);
   };
 
+  // COPY EXACT useEffect from page.tsx
   useEffect(() => {
     fetchTours();
-  }, []);
+  }, [currentPage, toursPerPage]);
 
   // Loading state
   if (loading) {
@@ -258,7 +282,7 @@ export default function TourManagement() {
         </div>
         <button
           onClick={() => setShowCreateTourPopup(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium cursor-pointer"
         >
           Tạo Tour Mới
         </button>
@@ -304,7 +328,11 @@ export default function TourManagement() {
               >
                 {/* Tour Image - HIỂN THỊ ẢNH THẬT */}
                 <div className="relative h-48">
-                  {tour.image_url ? (
+                  {tour.image_url &&
+                  tour.image_url.trim() !== "" &&
+                  tour.image_url.startsWith("http") &&
+                  !tour.image_url.includes("KHÔNG CÓ ẢNH") &&
+                  !tour.image_url.includes("string") ? (
                     <>
                       <img
                         src={tour.image_url}
@@ -327,8 +355,6 @@ export default function TourManagement() {
                           (e.target as HTMLImageElement).style.display = "none";
                         }}
                       />
-                      {/* Hiển thị URL ảnh để debug */}
-                      <div className="absolute bottom-0 left-0 right-0 bg-opacity-80 text-white text-xs p-1"></div>
                     </>
                   ) : (
                     <div className="w-full h-full bg-blue-400 flex flex-col items-center justify-center text-white">
@@ -433,7 +459,7 @@ export default function TourManagement() {
                     >
                       <button
                         onClick={() => showEditTour(tour)}
-                        className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors flex items-center"
+                        className="text-blue-600 hover:text-blue-800 p-1 rounded transition-colors flex items-center cursor-pointer"
                         title="Sửa tour"
                       >
                         <SquarePen className="h-4 w-4" />
@@ -442,7 +468,7 @@ export default function TourManagement() {
                         onClick={() =>
                           showDeleteConfirmation(tour.id, tour.tour_name)
                         }
-                        className="text-red-600 hover:text-red-800 p-1 rounded transition-colors flex items-center"
+                        className="text-red-600 hover:text-red-800 p-1 rounded transition-colors flex items-center cursor-pointer"
                         disabled={deletingTourId === tour.id}
                         title={
                           deletingTourId === tour.id
@@ -463,42 +489,86 @@ export default function TourManagement() {
             ))}
           </div>
 
-          {/* Load More Button */}
-          {tours.length < totalResults && (
-            <div className="text-center mt-8">
-              <button
-                onClick={loadMoreTours}
-                disabled={loadingMore}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md text-sm font-medium flex items-center mx-auto"
-              >
-                {loadingMore ? (
-                  <>
-                    <svg
-                      className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Đang tải...
-                  </>
-                ) : (
-                  `Tải thêm (${totalResults - tours.length} tour còn lại)`
-                )}
-              </button>
+          {/* Pagination - COPY EXACT FROM page.tsx */}
+          {totalResults > toursPerPage && (
+            <div className="mt-8 flex justify-center">
+              <div className="flex items-center space-x-2">
+                {/* Previous Button */}
+                <button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    currentPage === 1
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-white text-blue-600 border border-blue-600 hover:bg-blue-50"
+                  }`}
+                >
+                  Trước
+                </button>
+
+                {/* Page Numbers */}
+                {(() => {
+                  const totalPages = Math.ceil(totalResults / toursPerPage);
+                  const pageNumbers = [];
+                  const maxVisiblePages = 5;
+
+                  let startPage = Math.max(
+                    1,
+                    currentPage - Math.floor(maxVisiblePages / 2)
+                  );
+                  let endPage = Math.min(
+                    totalPages,
+                    startPage + maxVisiblePages - 1
+                  );
+
+                  if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                  }
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    pageNumbers.push(
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i)}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${
+                          currentPage === i
+                            ? "bg-blue-600 text-white"
+                            : "bg-white text-blue-600 border border-blue-600 hover:bg-blue-50"
+                        }`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+
+                  return pageNumbers;
+                })()}
+
+                {/* Next Button */}
+                <button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={
+                    currentPage >= Math.ceil(totalResults / toursPerPage)
+                  }
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    currentPage >= Math.ceil(totalResults / toursPerPage)
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-white text-blue-600 border border-blue-600 hover:bg-blue-50"
+                  }`}
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Page Info - COPY EXACT FROM page.tsx */}
+          {totalResults > 0 && (
+            <div className="mt-4 text-center text-sm text-gray-600">
+              Hiển thị{" "}
+              {Math.min((currentPage - 1) * toursPerPage + 1, totalResults)} -{" "}
+              {Math.min(currentPage * toursPerPage, totalResults)} trong tổng số{" "}
+              {totalResults} tour
             </div>
           )}
         </>

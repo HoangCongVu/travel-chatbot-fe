@@ -5,6 +5,7 @@ import LoginPopup from "@/components/LoginPopup";
 import RegisterPopup from "@/components/RegisterPopup";
 import UserDropdown from "@/components/UserDropdown";
 import { tourServices } from "@/services/tourServices";
+import { userTokenManager } from "@/services/authServices";
 
 // Define tour type based on actual API structure
 interface Tour {
@@ -46,6 +47,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showChatPopup, setShowChatPopup] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalTours, setTotalTours] = useState(0);
+  const toursPerPage = 10;
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -70,9 +74,9 @@ export default function Home() {
 
   // Check authentication status on component mount
   useEffect(() => {
-    const authStatus = localStorage.getItem("isAuthenticated");
-    const email = localStorage.getItem("userEmail");
-    if (authStatus === "true" && email) {
+    const token = userTokenManager.getToken();
+    const email = localStorage.getItem("userEmail"); // Keep email in localStorage for now
+    if (token && email) {
       setIsLoggedIn(true);
       setUserEmail(email);
     }
@@ -83,11 +87,55 @@ export default function Home() {
     const fetchTours = async () => {
       try {
         setLoading(true);
-        const response = await tourServices.fetchAllTours(1, 10);
-        console.log("API Response:", response);
+        console.log(
+          `🔍 Fetching page ${currentPage} with limit ${toursPerPage}`
+        );
+
+        const response = await tourServices.fetchAllTours(
+          currentPage,
+          toursPerPage
+        );
+        console.log("📥 API Response:", response);
+
         // Handle the actual API structure: response.data.tours
-        const toursData = response?.data?.tours || response?.tours || [];
+        let toursData = response?.data?.tours || response?.tours || [];
+        console.log(`📊 Tours received: ${toursData.length} tours`);
+
+        // If backend doesn't handle pagination properly, do it on frontend
+        const totalToursFromAPI = toursData.length;
+        const totalResults =
+          response?.total_results ||
+          response?.data?.total_results ||
+          totalToursFromAPI;
+
+        // Sort tours by creation date (newest first) if available
+        if (toursData.length > 0) {
+          toursData = toursData.sort((a: any, b: any) => {
+            // Assuming tours have a created_at or similar field
+            const dateA = new Date(a.created_at || a.tour_id || 0);
+            const dateB = new Date(b.created_at || b.tour_id || 0);
+            return dateB.getTime() - dateA.getTime(); // Newest first
+          });
+
+          // If API returns all tours, slice to show only current page
+          if (totalToursFromAPI > toursPerPage) {
+            const startIndex = (currentPage - 1) * toursPerPage;
+            const endIndex = startIndex + toursPerPage;
+            toursData = toursData.slice(startIndex, endIndex);
+            console.log(
+              `✂️ Sliced to show tours ${startIndex + 1}-${Math.min(
+                endIndex,
+                totalToursFromAPI
+              )}`
+            );
+          }
+        }
+
+        console.log(`📋 Final tours to display: ${toursData.length} tours`);
+        console.log(`🎯 Total results: ${totalResults}`);
+
         setTours(toursData);
+        setTotalTours(totalResults);
       } catch (err) {
         setError("Không thể tải danh sách tour. Vui lòng thử lại sau.");
         console.error("Error fetching tours:", err);
@@ -97,12 +145,11 @@ export default function Home() {
     };
 
     fetchTours();
-  }, []);
+  }, [currentPage, toursPerPage]);
 
   const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
+    userTokenManager.removeToken(); // Remove token from cookie
     localStorage.removeItem("userEmail");
-    localStorage.removeItem("userToken");
     localStorage.removeItem("userData");
     setIsLoggedIn(false);
     setUserEmail("");
@@ -417,7 +464,10 @@ export default function Home() {
                     >
                       <div className="flex">
                         <div className="w-64 h-48 bg-gray-200 flex-shrink-0">
-                          {tour.image_url ? (
+                          {tour.image_url &&
+                          tour.image_url.startsWith("http") &&
+                          !tour.image_url.includes("string") &&
+                          !tour.image_url.includes("KHÔNG CÓ ẢNH") ? (
                             <img
                               src={tour.image_url}
                               alt={tour.tour_name}
@@ -559,6 +609,92 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+
+                {/* Pagination */}
+                {totalTours > toursPerPage && (
+                  <div className="mt-8 flex justify-center">
+                    <div className="flex items-center space-x-2">
+                      {/* Previous Button */}
+                      <button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${
+                          currentPage === 1
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-white text-blue-600 border border-blue-600 hover:bg-blue-50"
+                        }`}
+                      >
+                        Trước
+                      </button>
+
+                      {/* Page Numbers */}
+                      {(() => {
+                        const totalPages = Math.ceil(totalTours / toursPerPage);
+                        const pageNumbers = [];
+                        const maxVisiblePages = 5;
+
+                        let startPage = Math.max(
+                          1,
+                          currentPage - Math.floor(maxVisiblePages / 2)
+                        );
+                        let endPage = Math.min(
+                          totalPages,
+                          startPage + maxVisiblePages - 1
+                        );
+
+                        if (endPage - startPage + 1 < maxVisiblePages) {
+                          startPage = Math.max(
+                            1,
+                            endPage - maxVisiblePages + 1
+                          );
+                        }
+
+                        for (let i = startPage; i <= endPage; i++) {
+                          pageNumbers.push(
+                            <button
+                              key={i}
+                              onClick={() => setCurrentPage(i)}
+                              className={`px-3 py-2 rounded-md text-sm font-medium ${
+                                currentPage === i
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white text-blue-600 border border-blue-600 hover:bg-blue-50"
+                              }`}
+                            >
+                              {i}
+                            </button>
+                          );
+                        }
+
+                        return pageNumbers;
+                      })()}
+
+                      {/* Next Button */}
+                      <button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={
+                          currentPage >= Math.ceil(totalTours / toursPerPage)
+                        }
+                        className={`px-3 py-2 rounded-md text-sm font-medium ${
+                          currentPage >= Math.ceil(totalTours / toursPerPage)
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-white text-blue-600 border border-blue-600 hover:bg-blue-50"
+                        }`}
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Page Info */}
+                {totalTours > 0 && (
+                  <div className="mt-4 text-center text-sm text-gray-600">
+                    Hiển thị{" "}
+                    {Math.min((currentPage - 1) * toursPerPage + 1, totalTours)}{" "}
+                    - {Math.min(currentPage * toursPerPage, totalTours)} trong
+                    tổng số {totalTours} tour
+                  </div>
+                )}
               </div>
             )}
           </div>

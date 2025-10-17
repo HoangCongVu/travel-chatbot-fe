@@ -1,10 +1,13 @@
 import axios from "axios";
 
 export const tourServices = {
-  fetchAllTours: async (page = 1, limit = 5) => {
-    const response = await axios.get(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/search-tours/tourpage?page=${page}&limit=${limit}`
-    );
+  fetchAllTours: async (page = 1, limit = 10) => {
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/search-tours/tourpage?page=${page}&limit=${limit}`;
+    console.log(`🔗 API URL: ${url}`);
+
+    const response = await axios.get(url);
+    console.log(`📡 Raw API Response:`, response.data);
+
     return response.data;
   },
 

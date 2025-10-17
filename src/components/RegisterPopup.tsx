@@ -15,6 +15,7 @@ export default function RegisterPopup({
   onSwitchToLogin,
 }: RegisterPopupProps) {
   const [formData, setFormData] = useState({
+    name: "",
     email: "",
     phone: "",
     password: "",
@@ -41,6 +42,7 @@ export default function RegisterPopup({
     try {
       // Validate input
       if (
+        !formData.name ||
         !formData.email ||
         !formData.phone ||
         !formData.password ||
@@ -59,10 +61,10 @@ export default function RegisterPopup({
 
       // Call register API
       const res = await authServices.register(
-        formData.email,
-        formData.password,
-        formData.email, // Use email as fullName for now
-        formData.phone
+        formData.name, // full_name
+        formData.phone, // phone_number
+        formData.email, // email
+        formData.password // password
       );
 
       if (res.success) {
@@ -140,6 +142,20 @@ export default function RegisterPopup({
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Họ và tên (*)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nhập họ và tên..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  required
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email (*)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Container,
@@ -29,6 +29,7 @@ import PriceByPackageForm from "./PriceByPackageForm";
 import PriceByDateForm from "./PriceByDateForm";
 import SpecificDepartureForm from "./SpecificDepartureForm";
 import RecurringScheduleForm from "./RecurringScheduleForm";
+import ImageUpload from "./ImageUpload";
 
 // Định nghĩa các interface cho quản lý state của form
 interface Destination {
@@ -134,6 +135,13 @@ export default function TourForm({
   const [active, setActive] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Debug initialValues
+  console.log("🔍 TourForm Props:", {
+    isEdit,
+    initialValues,
+    tourId: initialValues?.tour_id,
+  });
+
   // State for the different form sections
   const [destinations, setDestinations] = useState<Destination[]>([
     { destination_name: "", embedding_vector: null },
@@ -166,17 +174,31 @@ export default function TourForm({
   >({});
 
   const form = useForm({
-    initialValues: initialValues || {
-      tour_name: "",
-      tour_type_id: "1",
-      days: 1,
-      description: "",
-      itinerary_url: "",
-      detail_url: "",
-      promotion_info: "",
-      price_type: "Cố định",
-      price: undefined,
-    },
+    initialValues: initialValues
+      ? {
+          tour_name: initialValues.tour_name || "",
+          tour_type_id: initialValues.tour_type_id?.toString() || "1",
+          days: initialValues.days || 1,
+          description: initialValues.description || "",
+          highlight: initialValues.highlight || "",
+          itinerary_url: initialValues.itinerary_url || "",
+          image_url: initialValues.image_url || "",
+          promotion_info: initialValues.promotion_info || "",
+          price_type: initialValues.price_type || "Cố định",
+          price: initialValues.price || undefined,
+        }
+      : {
+          tour_name: "",
+          tour_type_id: "1",
+          days: 1,
+          description: "",
+          highlight: "",
+          itinerary_url: "",
+          image_url: "",
+          promotion_info: "",
+          price_type: "Cố định",
+          price: undefined,
+        },
     validate: yupResolver(schema),
   });
 
@@ -190,6 +212,108 @@ export default function TourForm({
 
   const priceType = form.values.price_type;
 
+  // Load initial data for edit mode
+  useEffect(() => {
+    if (isEdit && initialValues) {
+      console.log("Loading initial values for edit:", initialValues);
+
+      // Populate destinations
+      if (initialValues.destinations && initialValues.destinations.length > 0) {
+        const mappedDestinations = initialValues.destinations.map(
+          (dest: string) => ({
+            destination_name: dest,
+            embedding_vector: null,
+          })
+        );
+        setDestinations(mappedDestinations);
+      }
+
+      // Populate departures
+      if (initialValues.departures && initialValues.departures.length > 0) {
+        const mappedDepartures = initialValues.departures.map(
+          (dep: string) => ({
+            departure_name: dep,
+          })
+        );
+        setTourDepartures(mappedDepartures);
+      }
+
+      // Populate prices by package
+      if (
+        initialValues.price_by_packages &&
+        initialValues.price_by_packages.length > 0
+      ) {
+        const mappedPrices = initialValues.price_by_packages.map(
+          (pkg: any) => ({
+            package_name: pkg.package_name,
+            price: pkg.price,
+          })
+        );
+        setPricesByPackage(mappedPrices);
+      }
+
+      // Populate prices by date
+      if (
+        initialValues.price_by_dates &&
+        initialValues.price_by_dates.length > 0
+      ) {
+        const mappedPrices = initialValues.price_by_dates.map(
+          (datePrice: any) => ({
+            date: new Date(datePrice.date),
+            price: datePrice.price,
+          })
+        );
+        setPricesByDate(mappedPrices);
+      }
+
+      // Populate departure schedules
+      if (
+        initialValues.departure_schedules &&
+        initialValues.departure_schedules.length > 0
+      ) {
+        const recurringSchedules: RecurringSchedule[] = [];
+        const specificDepartures: SpecificDeparture[] = [];
+
+        initialValues.departure_schedules.forEach((schedule: any) => {
+          if (
+            schedule.schedule_type === "recurring" &&
+            schedule.recurring_schedules
+          ) {
+            schedule.recurring_schedules.forEach((recurring: any) => {
+              recurringSchedules.push({
+                recurrence_type: recurring.recurrence_type,
+                start_date: new Date(recurring.start_date),
+                end_date: new Date(recurring.end_date),
+                weekdays: recurring.weekdays || [],
+              });
+            });
+          }
+
+          if (
+            schedule.schedule_type === "specific" &&
+            schedule.specific_dates
+          ) {
+            schedule.specific_dates.forEach((date: string) => {
+              specificDepartures.push({
+                date: new Date(date),
+              });
+            });
+          }
+        });
+
+        if (recurringSchedules.length > 0) {
+          setRecurringSchedules(recurringSchedules);
+        }
+
+        if (specificDepartures.length > 0) {
+          setSpecificDepartures(specificDepartures);
+        }
+      }
+
+      console.log("Populated form data for edit mode");
+    }
+  }, [isEdit, initialValues]);
+
   const handleSubmit = async (values: any) => {
     setIsSubmitting(true);
     setError(null);
@@ -197,44 +321,89 @@ export default function TourForm({
     console.log("Starting form submission...");
 
     try {
-      // Create the main tour payload
+      let finalImageUrl = "";
+
+      // 🔥 STEP 1: Handle image upload if user selected a new file
+      if (values.image_url && values.image_url instanceof File) {
+        console.log("📤 Uploading image file...");
+        try {
+          const uploadResult = await createTourServices.uploadImage(
+            values.image_url
+          );
+          if (uploadResult.success) {
+            finalImageUrl = uploadResult.url;
+            console.log("✅ Image uploaded successfully:", finalImageUrl);
+          } else {
+            throw new Error(uploadResult.error || "Upload ảnh thất bại");
+          }
+        } catch (uploadError: any) {
+          console.error("❌ Image upload failed:", uploadError);
+          throw new Error("Upload ảnh thất bại: " + uploadError.message);
+        }
+      } else if (typeof values.image_url === "string") {
+        // Use existing image URL (for edit mode)
+        finalImageUrl = values.image_url;
+      }
+
+      // 🔥 STEP 2: Create the main tour payload
       const tourPayload: any = {
         tour_name: values.tour_name,
         tour_type_id: Number(values.tour_type_id),
         days: Number(values.days),
-        description: values.description || "",
-        highlight: "", // Add default empty highlight field to satisfy backend validation
+        description: values.description || "Chưa có mô tả",
+        highlight: values.highlight || "Chưa có điểm nổi bật",
         itinerary_url: values.itinerary_url || "",
-        image_url: values.detail_url || "",
-        promotion_info: values.promotion_info || "",
+        image_url: finalImageUrl,
+        promotion_info: values.promotion_info || "Chưa có khuyến mãi",
         price_type: values.price_type,
       };
 
       // Only add price if price_type is "Cố định"
       if (values.price_type === "Cố định" && values.price) {
-        tourPayload.price = Number(values.price);
+        tourPayload.price = String(values.price);
       }
 
       console.log("Submitting tour payload:", tourPayload);
 
-      // Submit the tour first
-      const tourResponse = await createTourServices.createTour(tourPayload);
-      console.log("Tour API response:", tourResponse);
+      // 🔥 STEP 3: Submit the tour (CREATE or UPDATE)
+      let tourResponse;
+      let tourId;
 
-      // Check if tour creation was successful
+      if (isEdit && initialValues?.tour_id) {
+        // UPDATE existing tour
+        tourId = initialValues.tour_id;
+        console.log("🔄 UPDATE MODE - Tour ID:", tourId);
+        tourResponse = await createTourServices.updateTour(tourId, tourPayload);
+        console.log("Tour UPDATE API response:", tourResponse);
+      } else {
+        // CREATE new tour
+        tourResponse = await createTourServices.createTour(tourPayload);
+        console.log("Tour CREATE API response:", tourResponse);
+
+        tourId = tourResponse.data?.id || tourResponse.id;
+        if (!tourId) {
+          console.error(
+            "Invalid or missing tour ID in response:",
+            tourResponse
+          );
+          throw new Error("Không nhận được ID tour từ API");
+        }
+      }
+
+      // Check if tour operation was successful
       if (!tourResponse.success) {
-        throw new Error(tourResponse.error || "Không thể tạo tour");
+        throw new Error(
+          tourResponse.error ||
+            (isEdit ? "Không thể cập nhật tour" : "Không thể tạo tour")
+        );
       }
 
-      const tourId = tourResponse.data?.id || tourResponse.id;
-      if (!tourId) {
-        console.error("Invalid or missing tour ID in response:", tourResponse);
-        throw new Error("Không nhận được ID tour từ API");
-      }
+      console.log(
+        `Successfully ${isEdit ? "updated" : "created"} tour with ID:`,
+        tourId
+      );
 
-      console.log("Successfully created tour with ID:", tourId);
-
-      // Batch process all related entities with proper error handling
+      // 🔥 STEP 4: Process all related entities (destinations, departures, prices, schedules)
       const results = await Promise.allSettled([
         // Process destinations
         (async () => {
@@ -591,189 +760,226 @@ export default function TourForm({
   };
 
   return (
-    <Container size="md" py="xl">
-      <Paper shadow="md" p="xl" radius="md" withBorder>
+    <Container
+      size="md"
+      py="xl"
+      style={{ height: "90vh", display: "flex", flexDirection: "column" }}
+    >
+      <Paper
+        shadow="md"
+        radius="md"
+        withBorder
+        style={{ display: "flex", flexDirection: "column", height: "100%" }}
+      >
         <LoadingOverlay
           visible={isSubmitting}
           overlayProps={{ radius: "sm", blur: 2 }}
         />
-        <Title order={2} ta="center" mb="xl" c="blue.6">
-          {isEdit ? "Cập Nhật Tour Du Lịch" : "Tạo Tour Mới"}
-        </Title>
 
-        {error && (
-          <Alert color="red" title="Lỗi" mb="md" icon={<IconAlertCircle />}>
-            {error}
-          </Alert>
-        )}
+        {/* Fixed Header */}
+        <div style={{ padding: "24px 24px 0 24px", flexShrink: 0 }}>
+          <Title order={2} ta="center" mb="xl" c="blue.6">
+            {isEdit ? "Cập Nhật Tour Du Lịch" : "Tạo Tour Mới"}
+          </Title>
 
-        {Object.keys(validationErrors).length > 0 && (
-          <Alert
-            color="orange"
-            title="Lỗi kiểm tra dữ liệu"
-            mb="md"
-            icon={<IconAlertCircle />}
-          >
-            <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
-              {Object.entries(validationErrors).map(([field, errors]) =>
-                errors.map((errorMessage, idx) => (
-                  <li key={`${field}-${idx}`}>
-                    <strong>{field}</strong>: {errorMessage}
-                  </li>
-                ))
-              )}
-            </ul>
-          </Alert>
-        )}
+          {error && (
+            <Alert color="red" title="Lỗi" mb="md" icon={<IconAlertCircle />}>
+              {error}
+            </Alert>
+          )}
 
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <Stepper active={active} onStepClick={setActive}>
-            <Stepper.Step label="Bước 1" description="Thông tin cơ bản">
-              <Stack gap="md">
-                <TextInput
-                  label="Tên Tour"
-                  placeholder="Nhập tên tour..."
-                  required
-                  error={getFieldError("tour_name") || form.errors.tour_name}
-                  {...form.getInputProps("tour_name")}
-                />
-                <Group grow>
-                  <Select
-                    label="Loại Tour"
-                    placeholder="Chọn loại tour"
-                    data={TOUR_TYPE_OPTIONS}
-                    required
-                    error={
-                      getFieldError("tour_type_id") || form.errors.tour_type_id
-                    }
-                    {...form.getInputProps("tour_type_id")}
-                  />
-                  <NumberInput
-                    label="Số Ngày"
-                    placeholder="Nhập số ngày"
-                    required
-                    min={1}
-                    error={getFieldError("days") || form.errors.days}
-                    {...form.getInputProps("days")}
-                  />
-                </Group>
-                <Textarea
-                  label="Mô Tả Tour"
-                  placeholder="Chi tiết về tour (tối thiểu 20 ký tự nếu nhập)..."
-                  autosize
-                  minRows={3}
-                  error={
-                    getFieldError("description") || form.errors.description
-                  }
-                  {...form.getInputProps("description")}
-                />
-                <TextInput
-                  label="URL Lịch Trình"
-                  placeholder="https://example.com/itinerary"
-                  type="url"
-                  error={
-                    getFieldError("itinerary_url") || form.errors.itinerary_url
-                  }
-                  {...form.getInputProps("itinerary_url")}
-                />
-                <TextInput
-                  label="Image URL"
-                  placeholder="https://example.com/detail"
-                  type="url"
-                  error={getFieldError("detail_url") || form.errors.detail_url}
-                  {...form.getInputProps("detail_url")}
-                />
-                <Textarea
-                  label="Thông Tin Khuyến Mãi"
-                  placeholder="Các ưu đãi hiện có..."
-                  error={
-                    getFieldError("promotion_info") ||
-                    form.errors.promotion_info
-                  }
-                  {...form.getInputProps("promotion_info")}
-                />
-              </Stack>
-            </Stepper.Step>
-            <Stepper.Step label="Bước 2" description="Điểm đến">
-              <TourDestinationForm
-                onChange={(v: Destination[]) => setDestinations(v)}
-                initialDestinations={destinations}
-              />
-            </Stepper.Step>
-            <Stepper.Step label="Bước 3" description="Điểm khởi hành">
-              <TourDepartureForm
-                onChange={(v: TourDeparture[]) => setTourDepartures(v)}
-                initialDepartures={tourDepartures}
-              />
-            </Stepper.Step>
-            <Stepper.Step label="Bước 4" description="Lịch trình">
-              <RecurringScheduleForm
-                onChange={(v: RecurringSchedule[]) => setRecurringSchedules(v)}
-                initialSchedules={recurringSchedules}
-              />
-              <SpecificDepartureForm
-                onChange={(v: SpecificDeparture[]) => setSpecificDepartures(v)}
-                initialDepartures={specificDepartures}
-              />
-            </Stepper.Step>
-            <Stepper.Step label="Bước 5" description="Giá">
-              <Select
-                label="Loại Giá"
-                placeholder="Chọn loại giá"
-                data={PRICE_TYPE_OPTIONS}
-                required
-                mb="md"
-                {...form.getInputProps("price_type")}
-              />
-              {priceType === "Cố định" && (
-                <NumberInput
-                  label="Giá (VND)"
-                  placeholder="Nhập giá..."
-                  min={1}
-                  required
-                  {...form.getInputProps("price")}
-                />
-              )}
-              {priceType === "Dựa trên ngày khởi hành" && (
-                <PriceByDateForm
-                  onChange={(v: PriceByDate[]) => setPricesByDate(v)}
-                  initialPrices={pricesByDate}
-                />
-              )}
-              {priceType === "Dựa trên gói" && (
-                <PriceByPackageForm
-                  onChange={(v: PriceByPackage[]) => setPricesByPackage(v)}
-                  initialPrices={pricesByPackage}
-                />
-              )}
-            </Stepper.Step>
-          </Stepper>
-          <Group justify="space-between" mt="xl">
-            <Button
-              variant="default"
-              onClick={() => setActive((current) => Math.max(current - 1, 0))}
-              disabled={active === 0}
+          {Object.keys(validationErrors).length > 0 && (
+            <Alert
+              color="orange"
+              title="Lỗi kiểm tra dữ liệu"
+              mb="md"
+              icon={<IconAlertCircle />}
             >
-              Quay lại
-            </Button>
-            {active < 4 ? (
+              <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                {Object.entries(validationErrors).map(([field, errors]) =>
+                  errors.map((errorMessage, idx) => (
+                    <li key={`${field}-${idx}`}>
+                      <strong>{field}</strong>: {errorMessage}
+                    </li>
+                  ))
+                )}
+              </ul>
+            </Alert>
+          )}
+        </div>
+
+        {/* Scrollable Form Content */}
+        <div
+          style={{ padding: "0 24px 24px 24px", flex: 1, overflowY: "auto" }}
+        >
+          <form onSubmit={form.onSubmit(handleSubmit)}>
+            <Stepper active={active} onStepClick={setActive}>
+              <Stepper.Step label="Bước 1" description="Thông tin cơ bản">
+                <Stack gap="md">
+                  <TextInput
+                    label="Tên Tour"
+                    placeholder="Nhập tên tour..."
+                    required
+                    error={getFieldError("tour_name") || form.errors.tour_name}
+                    {...form.getInputProps("tour_name")}
+                  />
+                  <Group grow>
+                    <Select
+                      label="Loại Tour"
+                      placeholder="Chọn loại tour"
+                      data={TOUR_TYPE_OPTIONS}
+                      required
+                      error={
+                        getFieldError("tour_type_id") ||
+                        form.errors.tour_type_id
+                      }
+                      {...form.getInputProps("tour_type_id")}
+                    />
+                    <NumberInput
+                      label="Số Ngày"
+                      placeholder="Nhập số ngày"
+                      required
+                      min={1}
+                      error={getFieldError("days") || form.errors.days}
+                      {...form.getInputProps("days")}
+                    />
+                  </Group>
+                  <Textarea
+                    label="Mô Tả Tour"
+                    placeholder="Chi tiết về tour (tối thiểu 20 ký tự nếu nhập)..."
+                    autosize
+                    minRows={3}
+                    error={
+                      getFieldError("description") || form.errors.description
+                    }
+                    {...form.getInputProps("description")}
+                  />
+                  <Textarea
+                    label="Điểm Nổi Bật"
+                    placeholder="Những điểm nổi bật của tour..."
+                    autosize
+                    minRows={2}
+                    error={getFieldError("highlight") || form.errors.highlight}
+                    {...form.getInputProps("highlight")}
+                  />
+                  <TextInput
+                    label="URL Lịch Trình"
+                    placeholder="https://example.com/itinerary"
+                    type="url"
+                    error={
+                      getFieldError("itinerary_url") ||
+                      form.errors.itinerary_url
+                    }
+                    {...form.getInputProps("itinerary_url")}
+                  />
+                  <ImageUpload
+                    label="Hình Ảnh Tour"
+                    value={form.values.image_url}
+                    onChange={(url) => form.setFieldValue("image_url", url)}
+                    error={
+                      (getFieldError("image_url") ||
+                        form.errors.image_url) as string
+                    }
+                    placeholder="Upload ảnh hoặc kéo thả file vào đây"
+                  />
+                  <Textarea
+                    label="Thông Tin Khuyến Mãi"
+                    placeholder="Các ưu đãi hiện có..."
+                    error={
+                      getFieldError("promotion_info") ||
+                      form.errors.promotion_info
+                    }
+                    {...form.getInputProps("promotion_info")}
+                  />
+                </Stack>
+              </Stepper.Step>
+              <Stepper.Step label="Bước 2" description="Điểm đến">
+                <TourDestinationForm
+                  onChange={(v: Destination[]) => setDestinations(v)}
+                  initialDestinations={destinations}
+                />
+              </Stepper.Step>
+              <Stepper.Step label="Bước 3" description="Điểm khởi hành">
+                <TourDepartureForm
+                  onChange={(v: TourDeparture[]) => setTourDepartures(v)}
+                  initialDepartures={tourDepartures}
+                />
+              </Stepper.Step>
+              <Stepper.Step label="Bước 4" description="Lịch trình">
+                <RecurringScheduleForm
+                  onChange={(v: RecurringSchedule[]) =>
+                    setRecurringSchedules(v)
+                  }
+                  initialSchedules={recurringSchedules}
+                />
+                <SpecificDepartureForm
+                  onChange={(v: SpecificDeparture[]) =>
+                    setSpecificDepartures(v)
+                  }
+                  initialDepartures={specificDepartures}
+                />
+              </Stepper.Step>
+              <Stepper.Step label="Bước 5" description="Giá">
+                <Select
+                  label="Loại Giá"
+                  placeholder="Chọn loại giá"
+                  data={PRICE_TYPE_OPTIONS}
+                  required
+                  mb="md"
+                  {...form.getInputProps("price_type")}
+                />
+                {priceType === "Cố định" && (
+                  <NumberInput
+                    label="Giá (VND)"
+                    placeholder="Nhập giá..."
+                    min={1}
+                    required
+                    {...form.getInputProps("price")}
+                  />
+                )}
+                {priceType === "Dựa trên ngày khởi hành" && (
+                  <PriceByDateForm
+                    onChange={(v: PriceByDate[]) => setPricesByDate(v)}
+                    initialPrices={pricesByDate}
+                  />
+                )}
+                {priceType === "Dựa trên gói" && (
+                  <PriceByPackageForm
+                    onChange={(v: PriceByPackage[]) => setPricesByPackage(v)}
+                    initialPrices={pricesByPackage}
+                  />
+                )}
+              </Stepper.Step>
+            </Stepper>
+            <Group justify="space-between" mt="xl">
               <Button
-                onClick={() => setActive((current) => Math.min(current + 1, 4))}
+                variant="default"
+                onClick={() => setActive((current) => Math.max(current - 1, 0))}
+                disabled={active === 0}
               >
-                Tiếp theo
+                Quay lại
               </Button>
-            ) : (
-              <Button
-                type="submit"
-                loading={isSubmitting}
-                variant="gradient"
-                gradient={{ from: "blue", to: "cyan" }}
-              >
-                {isEdit ? "Cập Nhật" : "Xong"}
-              </Button>
-            )}
-          </Group>
-        </form>
+              {active < 4 ? (
+                <Button
+                  onClick={() =>
+                    setActive((current) => Math.min(current + 1, 4))
+                  }
+                >
+                  Tiếp theo
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  loading={isSubmitting}
+                  variant="gradient"
+                  gradient={{ from: "blue", to: "cyan" }}
+                >
+                  {isEdit ? "Cập Nhật" : "Tạo Tour"}
+                </Button>
+              )}
+            </Group>
+          </form>
+        </div>
       </Paper>
     </Container>
   );

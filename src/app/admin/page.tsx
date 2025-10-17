@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import CreateTourPopup from "./createTour";
 import { useRouter } from "next/navigation";
-import { adminServices } from "@/services/adminServices";
+import { adminServices, tokenManager } from "@/services/adminServices";
 import TourAdminComponent from "./tourAdmin";
 import DocumentAdminComponent from "./documentAdmin";
 import UserManagementAdminComponent from "./userManagementAdmin";
@@ -12,28 +12,29 @@ type TabType = "users" | "chats" | "settings" | "documents" | "tours";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>("users");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Check authentication status
+    // Check authentication status using token from cookies via tokenManager
     const checkAuth = () => {
-      // TODO: Implement proper authentication check
-      const isLoggedIn = localStorage.getItem("isAuthenticated") === "true";
-      setIsAuthenticated(isLoggedIn);
+      const token = tokenManager.getToken();
       setLoading(false);
 
-      if (!isLoggedIn) {
+      if (!token) {
         router.push("admin/login");
+      } else {
+        // Successfully authenticated, ensure default tab is set
+        console.log("✅ Admin authenticated, showing admin panel");
       }
     };
 
     checkAuth();
-  }, []);
+  }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
+    // Use adminServices logout to properly clean up
+    adminServices.logout();
     router.push("admin/login");
   };
 
@@ -46,10 +47,6 @@ export default function AdminPage() {
         </div>
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    return null; // Will redirect to login
   }
 
   return (

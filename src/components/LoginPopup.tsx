@@ -47,7 +47,6 @@ export default function LoginPopup({
 
       if (res.success) {
         // Set authentication status
-        localStorage.setItem("isAuthenticated", "true");
         localStorage.setItem("userEmail", formData.email);
         localStorage.setItem("userToken", res.token || "");
         localStorage.setItem("userData", JSON.stringify(res.user || {}));

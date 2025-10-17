@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { authServices } from "@/services/authServices";
+import { adminServices } from "@/services/adminServices";
 import { useRouter } from "next/navigation";
 
 export default function LoginAdminForm() {
@@ -25,25 +25,16 @@ export default function LoginAdminForm() {
     setLoading(true);
 
     try {
-      // TODO: Implement login logic here
-      console.log("Login attempt:", formData);
+      console.log("Admin login attempt:", formData);
 
-      // Call login API
-      const res = await authServices.loginAdmin(
-        formData.email,
-        formData.password
-      );
-      console.log("Login response:", res);
+      // Call admin login API
+      const res = await adminServices.login(formData.email, formData.password);
+      console.log("Admin login response:", res);
 
       if (res.success) {
-        // Set authentication status
-        localStorage.setItem("isAuthenticated", "true");
-        localStorage.setItem("userEmail", formData.email);
-        // localStorage.setItem("userToken", res.token || "");
-        localStorage.setItem("userData", JSON.stringify(res.user || {}));
-
-        // Redirect to admin panel on success
-        router.push("/admin");
+        setTimeout(() => {
+          router.push("/admin");
+        }, 500);
       } else {
         throw new Error(res.error || "Invalid credentials");
       }
