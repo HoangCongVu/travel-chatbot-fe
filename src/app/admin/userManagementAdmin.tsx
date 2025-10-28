@@ -232,9 +232,9 @@ export default function UserManagementAdminComponent() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button className="text-blue-600 hover:text-blue-900 mr-3">
+                    {/* <button className="text-blue-600 hover:text-blue-900 mr-3">
                       Sửa
-                    </button>
+                    </button> */}
                     <button
                       onClick={() => showDeleteConfirmation(user.id, user.name)}
                       className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"

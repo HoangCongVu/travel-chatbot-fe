@@ -1,4 +1,5 @@
 import axios from "axios";
+import { tokenManager } from "./adminServices";
 
 export const tourServices = {
   fetchAllTours: async (page = 1, limit = 10) => {
@@ -20,7 +21,10 @@ export const tourServices = {
 
   deleteTour: async (tourId: string) => {
     const response = await axios.delete(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/tours/${tourId}`
+      `${process.env.NEXT_PUBLIC_API_URL}/api/tours/delete/${tourId}`,
+      {
+        headers: tokenManager.getAuthHeader(),
+      }
     );
     return response.data;
   },

@@ -6,15 +6,15 @@ interface HighlightLocation {
   location_name: string;
 }
 
-interface TourHighlightFormProps {
+interface TourHighlightLocationFormProps {
   initialLocations?: HighlightLocation[];
   onChange: (locations: HighlightLocation[]) => void;
 }
 
-export default function TourHighlightForm({
+export default function TourHighlightLocationForm({
   initialLocations = [{ location_name: "" }],
   onChange,
-}: TourHighlightFormProps) {
+}: TourHighlightLocationFormProps) {
   const [locations, setLocations] =
     useState<HighlightLocation[]>(initialLocations);
 
@@ -42,16 +42,13 @@ export default function TourHighlightForm({
 
   return (
     <>
-      {/* <Text fw={500} mb="xs">
-        Địa Điểm Nổi Bật
-      </Text> */}
-      {locations.map((loc, index) => (
+      {locations.map((location, index) => (
         <Group key={index} mt={index > 0 ? "md" : 0} align="flex-end">
           <TextInput
-            label={index === 0 ? "Tên Địa Điểm" : ""}
+            label={index === 0 ? "Tên Địa Điểm Nổi Bật" : ""}
             placeholder="Nhập tên địa điểm nổi bật..."
             style={{ flex: 1 }}
-            value={loc.location_name}
+            value={location.location_name}
             onChange={(e) => handleLocationChange(index, e.target.value)}
           />
           <ActionIcon

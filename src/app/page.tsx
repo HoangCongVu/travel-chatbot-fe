@@ -6,6 +6,8 @@ import RegisterPopup from "@/components/RegisterPopup";
 import UserDropdown from "@/components/UserDropdown";
 import { tourServices } from "@/services/tourServices";
 import { userTokenManager } from "@/services/authServices";
+import { chatServices } from "@/services/chatServices";
+import { Bot, Forward, MessageCircleCode, User } from "lucide-react";
 
 // Define tour type based on actual API structure
 interface Tour {
@@ -59,12 +61,13 @@ export default function Home() {
     },
     {
       id: 2,
-      text: "Em là nhân viên DLV xin được hỗ trợ Quý Anh/Chị ạ",
+      text: "Em là nhân viên Travel AI xin được hỗ trợ Quý Anh/Chị ạ",
       isBot: true,
       timestamp: new Date(),
     },
   ]);
   const [newMessage, setNewMessage] = useState("");
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto scroll to bottom when messages change
@@ -162,12 +165,14 @@ export default function Home() {
     }));
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (newMessage.trim()) {
-      // Add user message
+      const messageText = newMessage.trim();
+
+      // Add user message to UI immediately
       const userMessage = {
         id: messages.length + 1,
-        text: newMessage,
+        text: messageText,
         isBot: false,
         timestamp: new Date(),
       };
@@ -175,28 +180,67 @@ export default function Home() {
       setMessages((prev) => [...prev, userMessage]);
       setNewMessage("");
 
-      // Simulate bot response after a short delay
-      setTimeout(() => {
-        const botResponses = [
-          "Cảm ơn bạn đã liên hệ! Chúng tôi sẽ hỗ trợ bạn ngay.",
-          "Bạn muốn tìm hiểu về tour nào ạ?",
-          "Chúng tôi có nhiều tour hấp dẫn, bạn có thể xem danh sách trên trang chủ.",
-          "Để được tư vấn chi tiết, bạn vui lòng để lại số điện thoại nhé!",
-          "Chúng tôi sẽ liên hệ lại với bạn trong thời gian sớm nhất.",
-        ];
+      try {
+        let chatId = currentChatId;
 
-        const randomResponse =
-          botResponses[Math.floor(Math.random() * botResponses.length)];
+        // If no chat exists, create one with the first message as title
+        if (!chatId) {
+          console.log("Creating new chat with title:", messageText);
+          const createChatResponse = isLoggedIn
+            ? await chatServices.createUserChat(messageText)
+            : await chatServices.createAnonymousChat(messageText);
 
-        const botMessage = {
+          if (createChatResponse.success) {
+            chatId = createChatResponse.data.id;
+            setCurrentChatId(chatId);
+            console.log("Chat created successfully with ID:", chatId);
+          } else {
+            throw new Error(
+              createChatResponse.error || "Failed to create chat"
+            );
+          }
+        }
+
+        // Send message to chatbot
+        if (!chatId) {
+          throw new Error("Chat ID is required");
+        }
+
+        console.log("Sending message to chatbot:", { chatId, messageText });
+        const botResponse = await chatServices.sendMessageToChatBot(
+          chatId,
+          messageText
+        );
+
+        if (botResponse.success) {
+          // Add bot response to messages
+          const botMessage = {
+            id: messages.length + 2,
+            text:
+              botResponse.botResponse ||
+              botResponse.data?.reply ||
+              "Xin lỗi, tôi không thể trả lời lúc này.",
+            isBot: true,
+            timestamp: new Date(),
+          };
+
+          setMessages((prev) => [...prev, botMessage]);
+        } else {
+          throw new Error(botResponse.error || "Failed to get bot response");
+        }
+      } catch (error) {
+        console.error("Error in handleSendMessage:", error);
+
+        // Add error message as bot response
+        const errorMessage = {
           id: messages.length + 2,
-          text: randomResponse,
+          text: "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại sau.",
           isBot: true,
           timestamp: new Date(),
         };
 
-        setMessages((prev) => [...prev, botMessage]);
-      }, 1000);
+        setMessages((prev) => [...prev, errorMessage]);
+      }
     }
   };
 
@@ -204,6 +248,10 @@ export default function Home() {
     if (e.key === "Enter") {
       handleSendMessage();
     }
+  };
+
+  const handleOpenChatPopup = () => {
+    setShowChatPopup(true);
   };
 
   return (
@@ -270,7 +318,7 @@ export default function Home() {
                 ) : (
                   <button
                     onClick={() => setShowLoginPopup(true)}
-                    className="flex items-center text-gray-700 space-x-1 hover:text-blue-400"
+                    className="flex items-center text-gray-700 space-x-1 hover:text-blue-400 cursor-pointer"
                   >
                     <svg
                       className="w-4 h-4"
@@ -319,7 +367,7 @@ export default function Home() {
           }}
         ></div>
 
-        <div className="relative max-w-7xl mx-auto px-4 py-16">
+        {/* <div className="relative max-w-7xl mx-auto px-4 py-16">
           <div className="text-center">
             <div className="mb-6">
               <div className="text-4xl font-bold text-white mb-2 drop-shadow-lg">
@@ -359,7 +407,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Service Categories */}
@@ -763,7 +811,7 @@ export default function Home() {
               <h3 className="text-lg font-bold mb-2">
                 KHÁCH ĐOÀN TỔ CHỨC TOUR RIÊNG
               </h3>
-              <p className="text-sm mb-4">VUI LÒNG LIÊN HỆ - 09 0917 5088</p>
+              <p className="text-sm mb-4">VUI LÒNG LIÊN HỆ</p>
             </div>
           </div>
         </div>
@@ -792,14 +840,14 @@ export default function Home() {
       {/* Chat Icon - Fixed position in bottom right corner */}
       <div className="fixed bottom-6 right-6 z-50">
         <button
-          onClick={() => setShowChatPopup(true)}
-          className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 relative"
+          onClick={handleOpenChatPopup}
+          className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 relative cursor-pointer"
         >
           <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
             <path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" />
           </svg>
           <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-            3
+            2
           </div>
         </button>
       </div>
@@ -812,16 +860,10 @@ export default function Home() {
             <div className="bg-blue-500 text-white p-4 rounded-t-lg flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-4 h-4 text-blue-500"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" />
-                  </svg>
+                  <MessageCircleCode className="w-4 h-4 text-blue-500" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Travel AI</h3>
+                  <h3 className="font-semibold ">Travel AI</h3>
                   {/* <p className="text-sm text-blue-100">
                     Phục Vụ Bằng Cả Trái Tim
                   </p> */}
@@ -829,7 +871,7 @@ export default function Home() {
               </div>
               <button
                 onClick={() => setShowChatPopup(false)}
-                className="text-white hover:text-blue-200 transition-colors"
+                className="text-white hover:text-blue-200 transition-colors cursor-pointer"
               >
                 <svg
                   className="w-5 h-5"
@@ -859,13 +901,7 @@ export default function Home() {
                   >
                     {message.isBot && (
                       <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" />
-                        </svg>
+                        <Bot className="w-4 h-4 text-white" />
                       </div>
                     )}
                     <div
@@ -885,13 +921,7 @@ export default function Home() {
                     </div>
                     {!message.isBot && (
                       <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                        <User className="w-4 h-4 text-white" />
                       </div>
                     )}
                   </div>
@@ -901,53 +931,47 @@ export default function Home() {
             </div>
 
             {/* Input area */}
-            <div className="p-4 bg-white rounded-b-lg">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
+            <div className="p-2 bg-white rounded-b-lg">
+              <div className="flex items-end space-x-2">
+                <textarea
                   placeholder="Nhập tin nhắn..."
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+
+                    // reset chiều cao để tính scrollHeight chính xác
+                    e.target.style.height = "auto";
+
+                    // set chiều cao tối đa maxHeight
+                    const maxHeight = 120; // px
+                    if (e.target.scrollHeight > maxHeight) {
+                      e.target.style.height = maxHeight + "px";
+                      e.target.style.overflowY = "auto"; // bật scroll
+                    } else {
+                      e.target.style.height = e.target.scrollHeight + "px";
+                      e.target.style.overflowY = "hidden"; // ẩn scroll
+                    }
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  rows={1}
+                  className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm resize-none break-words focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  style={{ minHeight: "40px", maxHeight: "100px" }}
                 />
                 <button
                   onClick={handleSendMessage}
                   disabled={!newMessage.trim()}
-                  className={`rounded-full p-2 transition-colors ${
+                  className={`rounded-full p-3 transition-colors ${
                     newMessage.trim()
                       ? "bg-blue-500 hover:bg-blue-600 text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    />
-                  </svg>
-                </button>
-                <button className="text-gray-400 hover:text-gray-600 p-2">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                    />
-                  </svg>
+                  <Forward className="w-4 h-4 " />
                 </button>
               </div>
             </div>

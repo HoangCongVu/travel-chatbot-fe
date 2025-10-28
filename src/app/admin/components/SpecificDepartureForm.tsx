@@ -44,13 +44,13 @@ export default function SpecificDepartureForm({
 
   return (
     <>
-      <Text fw={500} mb="xs">
+      {/* <Text fw={500} mb="xs">
         Ngày Khởi Hành Cụ Thể
-      </Text>
+      </Text> */}
       {departures.map((departure, index) => (
         <Group key={index} mt={index > 0 ? "md" : 0} align="flex-end">
           <DateInput
-            label={index === 0 ? "Ngày Khởi Hành" : ""}
+            label={index === 0 ? "Ngày Khởi Hành Cụ Thể" : ""}
             placeholder="Chọn ngày khởi hành..."
             style={{ flex: 1 }}
             value={departure.date}

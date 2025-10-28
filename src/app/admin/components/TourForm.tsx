@@ -30,6 +30,8 @@ import PriceByDateForm from "./PriceByDateForm";
 import SpecificDepartureForm from "./SpecificDepartureForm";
 import RecurringScheduleForm from "./RecurringScheduleForm";
 import ImageUpload from "./ImageUpload";
+import TourHighlightLocationForm from "./TourHighlightLocationForm";
+import VisaPriceForm from "./VisaPriceForm";
 
 // Định nghĩa các interface cho quản lý state của form
 interface Destination {
@@ -60,6 +62,10 @@ interface SpecificDeparture {
 
 interface TourDeparture {
   departure_name: string; // Tên điểm khởi hành
+}
+
+interface HighlightLocation {
+  location_name: string; // Tên địa điểm nổi bật
 }
 
 // Schema validation sử dụng Yup
@@ -103,13 +109,33 @@ const schema = Yup.object().shape({
 });
 
 const TOUR_TYPE_OPTIONS = [
-  { value: "1", label: "Tour trong nước (nội địa)" },
-  { value: "2", label: "Tour quốc tế (nước ngoài)" },
-  { value: "3", label: "Tour trong ngày" },
-  { value: "4", label: "Combo du lịch (gói dịch vụ)" },
-  { value: "5", label: "Team building" },
-  { value: "6", label: "MICE (du lịch hội nghị, hội thảo)" },
-  { value: "7", label: "Free & Easy (vé máy bay + khách sạn)" },
+  {
+    value: "1",
+    label: "Tour trong nước (nội địa)",
+    name: "Tour trong nước (nội địa)",
+  },
+  {
+    value: "2",
+    label: "Tour quốc tế (nước ngoài)",
+    name: "Tour quốc tế (nước ngoài)",
+  },
+  { value: "3", label: "Tour trong ngày", name: "Tour trong ngày" },
+  {
+    value: "4",
+    label: "Combo du lịch (gói dịch vụ)",
+    name: "Combo du lịch (gói dịch vụ)",
+  },
+  { value: "5", label: "Team building", name: "Team building" },
+  {
+    value: "6",
+    label: "MICE (du lịch hội nghị, hội thảo)",
+    name: "MICE (du lịch hội nghị, hội thảo)",
+  },
+  {
+    value: "7",
+    label: "Free & Easy (vé máy bay + khách sạn)",
+    name: "Free & Easy (vé máy bay + khách sạn)",
+  },
 ];
 
 const PRICE_TYPE_OPTIONS = [
@@ -134,6 +160,8 @@ export default function TourForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [active, setActive] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [existingTourTypes, setExistingTourTypes] = useState<number[]>([]);
+  const [isLoadingTourTypes, setIsLoadingTourTypes] = useState(false);
 
   // Debug initialValues
   console.log("🔍 TourForm Props:", {
@@ -168,6 +196,10 @@ export default function TourForm({
   const [tourDepartures, setTourDepartures] = useState<TourDeparture[]>([
     { departure_name: "" },
   ]);
+  const [highlightLocations, setHighlightLocations] = useState<
+    HighlightLocation[]
+  >([{ location_name: "" }]);
+  const [visaPrice, setVisaPrice] = useState<number | null>(null);
 
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string[]>
@@ -211,6 +243,14 @@ export default function TourForm({
   };
 
   const priceType = form.values.price_type;
+
+  // Load existing tour types when component mounts
+  // Commented out because GET endpoint requires type_id parameter
+  // We'll let the backend handle duplicate tour types on CREATE
+  useEffect(() => {
+    // Skip loading tour types - backend will handle duplicates
+    console.log("⚠️ Skipping tour types load - will create on demand");
+  }, []);
 
   // Load initial data for edit mode
   useEffect(() => {
@@ -310,9 +350,76 @@ export default function TourForm({
         }
       }
 
+      // Populate highlight locations
+      if (
+        initialValues.highlight_locations &&
+        initialValues.highlight_locations.length > 0
+      ) {
+        const mappedLocations = initialValues.highlight_locations.map(
+          (loc: string) => ({
+            location_name: loc,
+          })
+        );
+        setHighlightLocations(mappedLocations);
+      }
+
+      // Populate visa price
+      if (
+        initialValues.visa_price !== undefined &&
+        initialValues.visa_price !== null
+      ) {
+        setVisaPrice(initialValues.visa_price);
+      }
+
       console.log("Populated form data for edit mode");
     }
   }, [isEdit, initialValues]);
+
+  // Helper function to ensure tour type exists
+  const ensureTourTypeExists = async (tourTypeId: number): Promise<boolean> => {
+    // Find the tour type name from TOUR_TYPE_OPTIONS
+    const tourTypeOption = TOUR_TYPE_OPTIONS.find(
+      (option) => option.value === tourTypeId.toString()
+    );
+
+    if (!tourTypeOption) {
+      console.error(`❌ Invalid tour type ID: ${tourTypeId}`);
+      return false;
+    }
+
+    try {
+      // STEP 1: Check if tour type exists using GET
+      console.log(`� Checking if tour type ${tourTypeId} exists...`);
+      const checkResponse = await createTourServices.getTourTypeById(
+        tourTypeId
+      );
+
+      if (checkResponse.exists && checkResponse.data) {
+        console.log(`✅ Tour type ${tourTypeId} already exists in database`);
+        return true;
+      }
+
+      // STEP 2: Tour type doesn't exist, create it
+      console.log(
+        `📝 Tour type ${tourTypeId} not found, creating new: ${tourTypeOption.name}`
+      );
+      const createResponse = await createTourServices.createTourType({
+        id: tourTypeId,
+        type_name: tourTypeOption.name,
+      });
+
+      if (createResponse.success) {
+        console.log(`✅ Successfully created tour type ${tourTypeId}`);
+        return true;
+      } else {
+        console.error(`❌ Failed to create tour type: ${createResponse.error}`);
+        throw new Error(createResponse.error || "Failed to create tour type");
+      }
+    } catch (error: any) {
+      console.error("Error ensuring tour type exists:", error);
+      throw error;
+    }
+  };
 
   const handleSubmit = async (values: any) => {
     setIsSubmitting(true);
@@ -321,6 +428,18 @@ export default function TourForm({
     console.log("Starting form submission...");
 
     try {
+      // 🔥 STEP 0: Ensure tour type exists
+      console.log("🔍 Checking tour type existence...");
+      const tourTypeId = Number(values.tour_type_id);
+
+      try {
+        await ensureTourTypeExists(tourTypeId);
+      } catch (tourTypeError: any) {
+        throw new Error(
+          `Không thể tạo/kiểm tra loại tour: ${tourTypeError.message}`
+        );
+      }
+
       let finalImageUrl = "";
 
       // 🔥 STEP 1: Handle image upload if user selected a new file
@@ -692,6 +811,76 @@ export default function TourForm({
             return { success: false, type: "schedules", error };
           }
         })(),
+
+        // Process highlight locations
+        (async () => {
+          try {
+            const validLocations = highlightLocations.filter(
+              (l) => l.location_name.trim() !== ""
+            );
+            console.log(
+              `Processing ${validLocations.length} highlight locations...`
+            );
+
+            for (const location of validLocations) {
+              const locationResponse =
+                await createTourServices.createTourHighlightLocation({
+                  tour_id: tourId,
+                  location_name: location.location_name,
+                });
+
+              if (!locationResponse.success) {
+                console.error(
+                  "Error creating highlight location:",
+                  locationResponse.error
+                );
+              } else {
+                console.log(
+                  "Highlight location response:",
+                  locationResponse.data
+                );
+              }
+            }
+            return { success: true, type: "highlight_locations" };
+          } catch (error) {
+            console.error("Error processing highlight locations:", error);
+            return { success: false, type: "highlight_locations", error };
+          }
+        })(),
+
+        // Process visa price
+        (async () => {
+          try {
+            if (
+              visaPrice !== undefined &&
+              visaPrice !== null &&
+              visaPrice >= 0
+            ) {
+              console.log(`Processing visa price: ${visaPrice}...`);
+
+              const visaResponse = await createTourServices.createVisaPrice({
+                tour_id: tourId,
+                price: visaPrice,
+              });
+
+              if (!visaResponse.success) {
+                console.error("Error creating visa price:", visaResponse.error);
+                return {
+                  success: false,
+                  type: "visa_price",
+                  error: visaResponse.error,
+                };
+              } else {
+                console.log("Visa price response:", visaResponse.data);
+                return { success: true, type: "visa_price" };
+              }
+            }
+            return { success: true, type: "visa_price" };
+          } catch (error) {
+            console.error("Error processing visa price:", error);
+            return { success: false, type: "visa_price", error };
+          }
+        })(),
       ]);
 
       // Log all results for debugging
@@ -898,6 +1087,13 @@ export default function TourForm({
                   onChange={(v: Destination[]) => setDestinations(v)}
                   initialDestinations={destinations}
                 />
+
+                <div style={{ marginTop: "24px" }}>
+                  <TourHighlightLocationForm
+                    onChange={(v) => setHighlightLocations(v)}
+                    initialLocations={highlightLocations}
+                  />
+                </div>
               </Stepper.Step>
               <Stepper.Step label="Bước 3" description="Điểm khởi hành">
                 <TourDepartureForm
@@ -949,6 +1145,13 @@ export default function TourForm({
                     initialPrices={pricesByPackage}
                   />
                 )}
+
+                <div style={{ marginTop: "24px" }}>
+                  <VisaPriceForm
+                    value={visaPrice}
+                    onChange={(v) => setVisaPrice(v)}
+                  />
+                </div>
               </Stepper.Step>
             </Stepper>
             <Group justify="space-between" mt="xl">
