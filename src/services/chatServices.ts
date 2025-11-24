@@ -162,6 +162,113 @@ export const chatServices = {
     }
   },
 
+  // Lấy tất cả các chat của user
+  getUserChats: async (userId: string): Promise<any> => {
+    try {
+      const authHeaders = userTokenManager.getAuthHeader();
+
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/chats/user/me`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders,
+          },
+        }
+      );
+
+      return {
+        data: response.data,
+        success: true,
+        status: response.status,
+        chats: response.data || [],
+      };
+    } catch (error: any) {
+      console.error("Get user chats error:", error);
+      return {
+        error:
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to get user chats",
+        success: false,
+        status: error.response?.status,
+        chats: [],
+      };
+    }
+  },
+
+  // Lấy tất cả tin nhắn của một chat
+  getChatMessages: async (chatId: string): Promise<any> => {
+    try {
+      const authHeaders = userTokenManager.getAuthHeader();
+
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/messages/${chatId}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders,
+          },
+        }
+      );
+
+      return {
+        data: response.data,
+        success: true,
+        status: response.status,
+        messages: response.data || [],
+      };
+    } catch (error: any) {
+      console.error("Get chat messages error:", error);
+      return {
+        error:
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to get chat messages",
+        success: false,
+        status: error.response?.status,
+        messages: [],
+      };
+    }
+  },
+
+  // Xóa một chat
+  deleteChat: async (chatId: string): Promise<any> => {
+    try {
+      const authHeaders = userTokenManager.getAuthHeader();
+
+      const response = await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/chats/delete/${chatId}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders,
+          },
+        }
+      );
+
+      return {
+        data: response.data,
+        success: true,
+        status: response.status,
+        message: response.data?.message || "Chat deleted successfully",
+      };
+    } catch (error: any) {
+      console.error("Delete chat error:", error);
+      return {
+        error:
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to delete chat",
+        success: false,
+        status: error.response?.status,
+      };
+    }
+  },
+
   // Generic API methods
   post: async (
     endpoint: string,

@@ -12,6 +12,16 @@ export const tourServices = {
     return response.data;
   },
 
+  fetchToursByType: async (tourTypeId: number, page = 1, limit = 10) => {
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/search-tours/search-by-type/${tourTypeId}?page=${page}&limit=${limit}`;
+    console.log(`🔗 Tour Type API URL: ${url}`);
+
+    const response = await axios.get(url);
+    console.log(`📡 Tour Type API Response:`, response.data);
+
+    return response.data;
+  },
+
   fetchTourById: async (tourId: string) => {
     const response = await axios.get(
       `${process.env.NEXT_PUBLIC_API_URL}/api/tours/${tourId}`

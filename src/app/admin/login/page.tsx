@@ -179,7 +179,10 @@ export default function LoginAdminForm() {
           </form>
 
           <div className="mt-6 text-center">
-            <a href="#" className="text-sm text-blue-600 hover:text-blue-500">
+            <a
+              href="#"
+              className="text-sm text-blue-600 hover:text-blue-500 cursor-pointer"
+            >
               Quên mật khẩu?
             </a>
           </div>

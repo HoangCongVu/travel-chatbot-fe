@@ -74,7 +74,7 @@ export default function LoginPopup({
           <h2 className="text-2xl text-black font-bold">Đăng nhập</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 cursor-pointer"
           >
             <svg
               className="w-6 h-6"
@@ -174,14 +174,14 @@ export default function LoginPopup({
         <div className="mt-4 text-center">
           <button
             onClick={onSwitchToRegister}
-            className="text-blue-500 hover:text-blue-600 text-sm"
+            className="text-blue-500 hover:text-blue-600 text-sm cursor-pointer"
           >
             Bạn chưa có tài khoản? Đăng ký ngay
           </button>
         </div>
 
         <div className="mt-4 text-center">
-          <button className="text-gray-500 hover:text-gray-700 text-sm">
+          <button className="text-gray-500 hover:text-gray-700 text-sm cursor-pointer">
             Quên mật khẩu?
           </button>
         </div>
