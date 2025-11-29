@@ -36,6 +36,8 @@ export default function AdminPage() {
   const handleLogout = () => {
     // Use adminServices logout to properly clean up
     adminServices.logout();
+    // Set logout success flag for login page to show notification
+    localStorage.setItem("admin_logout_success", "true");
     router.push("admin/login");
   };
 
@@ -105,6 +107,30 @@ export default function AdminPage() {
               </button>
 
               <button
+                onClick={() => setActiveTab("chats")}
+                className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
+                  activeTab === "chats"
+                    ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <svg
+                  className="w-5 h-5 mr-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+                Chat Management
+              </button>
+
+              <button
                 onClick={() => setActiveTab("tours")}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
                   activeTab === "tours"
@@ -132,30 +158,6 @@ export default function AdminPage() {
                   />
                 </svg>
                 Tours
-              </button>
-
-              <button
-                onClick={() => setActiveTab("chats")}
-                className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  activeTab === "chats"
-                    ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }`}
-              >
-                <svg
-                  className="w-5 h-5 mr-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  />
-                </svg>
-                Chat Management
               </button>
 
               <button
@@ -248,11 +250,14 @@ function ChatManagement() {
 
   const [notification, setNotification] = useState<{
     show: boolean;
-    type: "success" | "error";
+    type: "success" | "error" | "warning";
     message: string;
   }>({ show: false, type: "success", message: "" });
 
-  const showNotification = (type: "success" | "error", message: string) => {
+  const showNotification = (
+    type: "success" | "error" | "warning",
+    message: string
+  ) => {
     setNotification({ show: true, type, message });
     setTimeout(() => {
       setNotification({ show: false, type, message: "" });
@@ -319,7 +324,7 @@ function ChatManagement() {
       if (response.success) {
         setFollowUpEnabled(!followUpEnabled);
         showNotification(
-          "success",
+          action === "disable" ? "warning" : "success",
           response.message ||
             `Follow-up ${
               action === "enable" ? "đã được bật" : "đã được tắt"
@@ -412,6 +417,8 @@ function ChatManagement() {
             className={`flex items-center space-x-3 px-4 py-3 rounded-lg shadow-lg border-l-4 ${
               notification.type === "success"
                 ? "bg-white border-green-500"
+                : notification.type === "warning"
+                ? "bg-white border-red-500"
                 : "bg-white border-red-500"
             } max-w-md`}
           >
@@ -455,10 +462,16 @@ function ChatManagement() {
                 className={`text-sm font-medium ${
                   notification.type === "success"
                     ? "text-green-800"
+                    : notification.type === "warning"
+                    ? "text-red-800"
                     : "text-red-800"
                 }`}
               >
-                {notification.type === "success" ? "Thành công!" : "Lỗi!"}
+                {notification.type === "success"
+                  ? "Thành công!"
+                  : notification.type === "warning"
+                  ? "Thành công!"
+                  : "Lỗi!"}
               </p>
               <p className="text-sm text-gray-600 mt-1">
                 {notification.message}
@@ -674,44 +687,46 @@ function ChatManagement() {
                   <p>Chưa có tin nhắn</p>
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${
-                      message.role === "user" ? "justify-start" : "justify-end"
-                    }`}
-                  >
+                messages.map((message) => {
+                  const isUser = message.role === "user";
+                  const isAssistantOrAdmin =
+                    message.role === "assistant" ||
+                    message.role === "admin" ||
+                    message.sender === "admin";
+
+                  return (
                     <div
-                      className={`max-w-md px-4 py-2 rounded-lg ${
-                        message.role === "user"
-                          ? "bg-gray-200 text-gray-900"
-                          : message.role === "assistant"
-                          ? "bg-blue-500 text-white"
-                          : message.sender === "admin"
-                          ? "bg-blue-500 text-white"
-                          : "bg-white text-gray-900 border border-gray-200"
+                      key={message.id}
+                      className={`flex ${
+                        isUser ? "justify-start" : "justify-end"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                      <p
-                        className={`text-xs mt-1 ${
-                          message.sender === "admin"
-                            ? "text-blue-100"
-                            : "text-gray-500"
+                      <div
+                        className={`max-w-md px-4 py-2 rounded-lg ${
+                          isUser
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-blue-500 text-white"
                         }`}
                       >
-                        {new Date(
-                          message.created_at || message.timestamp
-                        ).toLocaleTimeString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {message.content}
+                        </p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            isUser ? "text-gray-500" : "text-blue-100"
+                          }`}
+                        >
+                          {new Date(
+                            message.created_at || message.timestamp
+                          ).toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -903,14 +918,64 @@ function Settings() {
     <div className="p-6">
       {/* Notification */}
       {notification.show && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg ${
-            notification.type === "success"
-              ? "bg-green-500 text-white"
-              : "bg-red-500 text-white"
-          }`}
-        >
-          <p className="font-medium">{notification.message}</p>
+        <div className="fixed top-4 right-4 z-[60] animate-slide-in-right">
+          <div
+            className={`flex items-center space-x-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 ${
+              notification.type === "success"
+                ? "bg-white border-green-500"
+                : "bg-white border-red-500"
+            } max-w-md`}
+          >
+            <div className="flex-shrink-0">
+              {notification.type === "success" ? (
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-green-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+              ) : (
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-red-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p
+                className={`text-sm font-semibold ${
+                  notification.type === "success"
+                    ? "text-green-800"
+                    : "text-red-800"
+                }`}
+              >
+                {notification.type === "success" ? "Thành công!" : "Lỗi!"}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                {notification.message}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

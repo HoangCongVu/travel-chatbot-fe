@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { adminServices } from "@/services/adminServices";
-import { Trash2 } from "lucide-react";
+import { Trash2, CheckCircle, XCircle, Info } from "lucide-react";
 
 // Document Management Component
 export default function DocumentManagement() {
@@ -16,6 +16,22 @@ export default function DocumentManagement() {
     name: string;
   } | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: "success" | "error" | "info";
+    message: string;
+  }>({ show: false, type: "info", message: "" });
+
+  // Helper function to show notification
+  const showNotification = (
+    type: "success" | "error" | "info",
+    message: string
+  ) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => {
+      setNotification({ show: false, type: "info", message: "" });
+    }, 3000);
+  };
 
   // Fetch documents from API on component mount
   useEffect(() => {
@@ -26,6 +42,7 @@ export default function DocumentManagement() {
         setDocuments(data);
       } catch (error) {
         console.error("Error fetching documents:", error);
+        showNotification("error", "Không thể tải danh sách tài liệu");
       } finally {
         setLoading(false);
       }
@@ -60,22 +77,63 @@ export default function DocumentManagement() {
     }
   };
 
-  const handleFiles = (files: FileList) => {
-    Array.from(files).forEach((file) => {
-      // TODO: Implement file upload to API
-      const newDoc = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+  const handleFiles = async (files: FileList) => {
+    setShowUploadPopup(false);
+
+    let uploadSuccess = false;
+    let failedCount = 0;
+
+    for (const file of Array.from(files)) {
+      // Add temporary document to show upload progress
+      const tempId = `temp-${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      const tempDoc = {
+        id: tempId,
         file_name: file.name,
-        file_url: "#", // This will be set after upload
+        file_url: "#",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        admin_id: "temp", // This should come from auth context
-        status: "Đang tải lên",
+        status: "Đang tải lên...",
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
       };
-      setDocuments((prev) => [...prev, newDoc]);
-    });
-    setShowUploadPopup(false);
+      setDocuments((prev) => [...prev, tempDoc]);
+
+      try {
+        // Call API to upload file
+        await adminServices.uploadFileAgent(file);
+        uploadSuccess = true;
+
+        // Remove temp document
+        setDocuments((prev) => prev.filter((doc) => doc.id !== tempId));
+      } catch (error: any) {
+        console.error("Upload error:", error);
+        failedCount++;
+        // Remove failed upload from list
+        setDocuments((prev) => prev.filter((doc) => doc.id !== tempId));
+      }
+    }
+
+    // Reload documents list after all uploads
+    if (uploadSuccess) {
+      try {
+        const data = await adminServices.fetchAllFiles();
+        setDocuments(data);
+
+        if (failedCount === 0) {
+          showNotification("success", "Tải lên tài liệu thành công!");
+        } else {
+          showNotification(
+            "success",
+            `Tải lên thành công! (${failedCount} tệp thất bại)`
+          );
+        }
+      } catch (error) {
+        console.error("Error refreshing documents:", error);
+      }
+    } else if (failedCount > 0) {
+      showNotification("error", "Tải lên tất cả tệp thất bại");
+    }
   };
 
   // Show delete confirmation popup
@@ -100,9 +158,13 @@ export default function DocumentManagement() {
       // Close popup and reset state
       setShowDeleteConfirm(false);
       setFileToDelete(null);
+      showNotification("success", "Đã xóa tài liệu thành công");
     } catch (error: any) {
       console.error("Error deleting file:", error);
-      alert("Lỗi khi xóa tài liệu: " + (error.message || "Unknown error"));
+      showNotification(
+        "error",
+        "Lỗi khi xóa tài liệu: " + (error.message || "Unknown error")
+      );
     } finally {
       setDeletingFileId(null);
     }
@@ -116,6 +178,57 @@ export default function DocumentManagement() {
 
   return (
     <div className="p-6">
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-[60] animate-slide-in-right">
+          <div
+            className={`flex items-center space-x-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 ${
+              notification.type === "success"
+                ? "bg-white border-green-500"
+                : notification.type === "error"
+                ? "bg-white border-red-500"
+                : "bg-white border-blue-500"
+            } max-w-md`}
+          >
+            <div className="flex-shrink-0">
+              {notification.type === "success" ? (
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-green-500" />
+                </div>
+              ) : notification.type === "error" ? (
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <XCircle className="w-6 h-6 text-red-500" />
+                </div>
+              ) : (
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Info className="w-6 h-6 text-blue-500" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p
+                className={`text-sm font-semibold ${
+                  notification.type === "success"
+                    ? "text-green-800"
+                    : notification.type === "error"
+                    ? "text-red-800"
+                    : "text-blue-800"
+                }`}
+              >
+                {notification.type === "success"
+                  ? "Thành công!"
+                  : notification.type === "error"
+                  ? "Lỗi!"
+                  : "Thông báo"}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                {notification.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-900">
           Quản lý Tài liệu
@@ -202,9 +315,34 @@ export default function DocumentManagement() {
                     {new Date(doc.created_at).toLocaleString("vi-VN")}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                      Đã tải lên
-                    </span>
+                    {doc.status === "Đang tải lên..." ? (
+                      <span className="inline-flex items-center gap-2 px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                        <svg
+                          className="animate-spin h-3 w-3"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Đang tải lên...
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                        {doc.status || "Đã tải lên"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     -

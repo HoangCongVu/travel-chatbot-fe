@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { adminServices } from "@/services/adminServices";
 import { useRouter } from "next/navigation";
+import { CheckCircle, XCircle } from "lucide-react";
 
 export default function LoginAdminForm() {
   const [formData, setFormData] = useState({
@@ -11,7 +12,31 @@ export default function LoginAdminForm() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: "success" | "error" | "logout";
+    message: string;
+  }>({ show: false, type: "success", message: "" });
   const router = useRouter();
+
+  const showNotification = (
+    type: "success" | "error" | "logout",
+    message: string
+  ) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => {
+      setNotification({ show: false, type, message: "" });
+    }, 3000);
+  };
+
+  useEffect(() => {
+    // Check if user just logged out
+    const logoutSuccess = localStorage.getItem("admin_logout_success");
+    if (logoutSuccess === "true") {
+      localStorage.removeItem("admin_logout_success");
+      showNotification("logout", "Đăng xuất thành công!");
+    }
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -32,6 +57,7 @@ export default function LoginAdminForm() {
       console.log("Admin login response:", res);
 
       if (res.success) {
+        showNotification("success", "Đăng nhập thành công!");
         setTimeout(() => {
           router.push("/admin");
         }, 500);
@@ -40,7 +66,10 @@ export default function LoginAdminForm() {
       }
     } catch (error) {
       console.error("Login failed:", error);
-      alert("Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.");
+      showNotification(
+        "error",
+        "Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu."
+      );
     } finally {
       setLoading(false);
     }
@@ -48,6 +77,57 @@ export default function LoginAdminForm() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-[60] animate-slide-in-right">
+          <div
+            className={`flex items-center space-x-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 ${
+              notification.type === "success"
+                ? "bg-white border-green-500"
+                : notification.type === "logout"
+                ? "bg-white border-red-500"
+                : "bg-white border-red-500"
+            } max-w-md`}
+          >
+            <div className="flex-shrink-0">
+              {notification.type === "success" ? (
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-green-500" />
+                </div>
+              ) : notification.type === "logout" ? (
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-red-500" />
+                </div>
+              ) : (
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <XCircle className="w-6 h-6 text-red-500" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p
+                className={`text-sm font-semibold ${
+                  notification.type === "success"
+                    ? "text-green-800"
+                    : notification.type === "logout"
+                    ? "text-red-800"
+                    : "text-red-800"
+                }`}
+              >
+                {notification.type === "success"
+                  ? "Thành công!"
+                  : notification.type === "logout"
+                  ? "Thành công!"
+                  : "Lỗi!"}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                {notification.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">

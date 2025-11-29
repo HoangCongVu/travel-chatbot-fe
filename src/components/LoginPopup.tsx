@@ -50,6 +50,7 @@ export default function LoginPopup({
         localStorage.setItem("userEmail", formData.email);
         localStorage.setItem("userToken", res.token || "");
         localStorage.setItem("userData", JSON.stringify(res.user || {}));
+        localStorage.setItem("user_login_success", "true");
 
         // Close popup and reload page
         onClose();

@@ -195,26 +195,38 @@ export const adminServices = {
       throw error;
     }
   },
-  uploadFileAgent: async (file: File, adminId: UUID) => {
+  uploadFileAgent: async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("admin_id", adminId);
+
+    const token = tokenManager.getToken();
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
 
     try {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/upload-files-agent/upload`,
         formData,
         {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
-      alert(response.data.message);
       return response.data;
     } catch (error: any) {
-      alert(
-        "Upload thất bại: " + (error.response?.data?.detail || error.message)
-      );
+      // Handle token expiration
+      if (
+        error.response?.status === 401 &&
+        (error.response.data.detail === "Token expired" ||
+          error.response.data.detail === "Could not validate credentials")
+      ) {
+        tokenManager.removeToken();
+        window.location.href = "/admin/login";
+      }
       throw error;
     }
   },
@@ -452,7 +464,7 @@ export const adminServices = {
     try {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/chats/${chatId}/admin-message`,
-        { message },
+        { content: message },
         {
           headers: {
             "Content-Type": "application/json",

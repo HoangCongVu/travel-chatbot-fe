@@ -4,7 +4,14 @@ import { useState, useEffect } from "react";
 import { tourServices } from "@/services/tourServices";
 import CreateTourPopup from "./createTour";
 import { TourForm } from "./components";
-import { Trash2, Loader2, SquarePen } from "lucide-react";
+import {
+  Trash2,
+  Loader2,
+  SquarePen,
+  CheckCircle,
+  XCircle,
+  Info,
+} from "lucide-react";
 
 // Tour Management Component
 export default function TourManagement() {
@@ -25,6 +32,22 @@ export default function TourManagement() {
   const [showTourDetail, setShowTourDetail] = useState(false);
   const [editingTour, setEditingTour] = useState<any>(null);
   const [showEditTourPopup, setShowEditTourPopup] = useState(false);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: "success" | "error" | "info";
+    message: string;
+  }>({ show: false, type: "info", message: "" });
+
+  // Helper function to show notification
+  const showNotification = (
+    type: "success" | "error" | "info",
+    message: string
+  ) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => {
+      setNotification({ show: false, type: "info", message: "" });
+    }, 3000);
+  };
 
   // Fetch tours from API - COPY EXACT LOGIC FROM page.tsx
   const fetchTours = async () => {
@@ -202,9 +225,13 @@ export default function TourManagement() {
       // Close popup and reset state
       setShowDeleteConfirm(false);
       setTourToDelete(null);
+      showNotification("success", "Đã xóa tour thành công");
     } catch (error: any) {
       console.error("Error deleting tour:", error);
-      alert("Lỗi khi xóa tour: " + (error.message || "Unknown error"));
+      showNotification(
+        "error",
+        "Lỗi khi xóa tour: " + (error.message || "Unknown error")
+      );
     } finally {
       setDeletingTourId(null);
     }
@@ -278,6 +305,57 @@ export default function TourManagement() {
 
   return (
     <div className="p-6">
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-[60] animate-slide-in-right">
+          <div
+            className={`flex items-center space-x-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 ${
+              notification.type === "success"
+                ? "bg-white border-green-500"
+                : notification.type === "error"
+                ? "bg-white border-red-500"
+                : "bg-white border-blue-500"
+            } max-w-md`}
+          >
+            <div className="flex-shrink-0">
+              {notification.type === "success" ? (
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-green-500" />
+                </div>
+              ) : notification.type === "error" ? (
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <XCircle className="w-6 h-6 text-red-500" />
+                </div>
+              ) : (
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Info className="w-6 h-6 text-blue-500" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p
+                className={`text-sm font-semibold ${
+                  notification.type === "success"
+                    ? "text-green-800"
+                    : notification.type === "error"
+                    ? "text-red-800"
+                    : "text-blue-800"
+                }`}
+              >
+                {notification.type === "success"
+                  ? "Thành công!"
+                  : notification.type === "error"
+                  ? "Lỗi!"
+                  : "Thông báo"}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                {notification.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Quản lý Tour</h2>

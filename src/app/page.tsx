@@ -85,7 +85,7 @@ export default function Home() {
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [notification, setNotification] = useState<{
     show: boolean;
-    type: "success" | "error" | "info";
+    type: "success" | "error" | "info" | "logout";
     message: string;
   }>({ show: false, type: "success", message: "" });
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -100,9 +100,25 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Check for login/register success
+  useEffect(() => {
+    const loginSuccess = localStorage.getItem("user_login_success");
+    const registerSuccess = localStorage.getItem("user_register_success");
+
+    if (loginSuccess === "true") {
+      localStorage.removeItem("user_login_success");
+      showNotification("success", "Đăng nhập thành công!");
+    }
+
+    if (registerSuccess === "true") {
+      localStorage.removeItem("user_register_success");
+      showNotification("success", "Đăng ký thành công!");
+    }
+  }, []);
+
   // Helper function to show notification
   const showNotification = (
-    type: "success" | "error" | "info",
+    type: "success" | "error" | "info" | "logout",
     message: string
   ) => {
     setNotification({ show: true, type, message });
@@ -219,6 +235,7 @@ export default function Home() {
     localStorage.removeItem("userData");
     setIsLoggedIn(false);
     setUserEmail("");
+    showNotification("logout", "Đăng xuất thành công!");
   };
 
   // Handle tour type search
@@ -411,7 +428,9 @@ export default function Home() {
             isBot:
               msg.sender === "bot" ||
               msg.sender === "system" ||
-              msg.role === "assistant",
+              msg.sender === "admin" ||
+              msg.role === "assistant" ||
+              msg.role === "admin",
             timestamp: new Date(msg.created_at || msg.timestamp),
           })
         );
@@ -489,6 +508,8 @@ export default function Home() {
                 ? "bg-white border-green-500"
                 : notification.type === "error"
                 ? "bg-white border-red-500"
+                : notification.type === "logout"
+                ? "bg-white border-red-500"
                 : "bg-white border-blue-500"
             } max-w-md`}
           >
@@ -525,6 +546,22 @@ export default function Home() {
                     />
                   </svg>
                 </div>
+              ) : notification.type === "logout" ? (
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-red-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
               ) : (
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <svg
@@ -550,6 +587,8 @@ export default function Home() {
                     ? "text-green-800"
                     : notification.type === "error"
                     ? "text-red-800"
+                    : notification.type === "logout"
+                    ? "text-red-800"
                     : "text-blue-800"
                 }`}
               >
@@ -557,6 +596,8 @@ export default function Home() {
                   ? "Thành công!"
                   : notification.type === "error"
                   ? "Lỗi!"
+                  : notification.type === "logout"
+                  ? "Thành công!"
                   : "Thông báo"}
               </p>
               <p className="text-sm text-gray-600 mt-1">

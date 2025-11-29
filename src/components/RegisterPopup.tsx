@@ -69,6 +69,7 @@ export default function RegisterPopup({
 
       if (res.success) {
         setSuccess(true);
+        localStorage.setItem("user_register_success", "true");
         // Auto switch to login after 2 seconds
         setTimeout(() => {
           setSuccess(false);
