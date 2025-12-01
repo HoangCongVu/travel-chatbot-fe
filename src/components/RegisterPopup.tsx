@@ -90,7 +90,7 @@ export default function RegisterPopup({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-100 max-w-md mx-4 max-h-screen overflow-y-auto">
+      <div className="bg-white rounded-lg p-6 w-110 max-w-md mx-4 max-h-screen overflow-y-auto">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-2xl text-black font-bold">Đăng ký</h2>
           <button
@@ -226,7 +226,7 @@ export default function RegisterPopup({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white py-3 rounded-md font-medium transition-colors cursor-pointer"
+                className="w-full bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white py-3 rounded-md font-medium transition-colors cursor-pointer"
               >
                 {loading ? "Đang đăng ký..." : "ĐĂNG KÝ"}
               </button>

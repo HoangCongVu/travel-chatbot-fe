@@ -166,7 +166,7 @@ export default function LoginPopup({
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white py-3 rounded-md font-medium transition-colors"
+            className="w-full bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white py-3 rounded-md font-medium transition-colors cursor-pointer"
           >
             {loading ? "Đang đăng nhập..." : "ĐĂNG NHẬP"}
           </button>

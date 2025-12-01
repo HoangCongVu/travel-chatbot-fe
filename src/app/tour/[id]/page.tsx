@@ -3,6 +3,8 @@
 import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { tourServices } from "@/services/tourServices";
+import ChatPopup from "@/components/ChatPopup";
+import { userTokenManager } from "@/services/authServices";
 
 interface Tour {
   tour_id?: string;
@@ -42,8 +44,30 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
   const [tour, setTour] = useState<Tour | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("details");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
   const router = useRouter();
   const requestMadeRef = useRef(false);
+
+  // Check authentication status
+  useEffect(() => {
+    const token = userTokenManager.getToken();
+    const email = localStorage.getItem("userEmail");
+    if (token && email) {
+      setIsLoggedIn(true);
+      setUserEmail(email);
+    }
+  }, []);
+
+  // Handle token expiration
+  const handleTokenExpired = () => {
+    userTokenManager.removeToken();
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userData");
+    setIsLoggedIn(false);
+    setUserEmail("");
+    alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+  };
 
   useEffect(() => {
     const fetchTourDetail = async () => {
@@ -501,6 +525,13 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Chat Popup Component */}
+      <ChatPopup
+        isLoggedIn={isLoggedIn}
+        userEmail={userEmail}
+        onTokenExpired={handleTokenExpired}
+      />
     </div>
   );
 }

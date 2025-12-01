@@ -365,7 +365,7 @@ export default function TourManagement() {
         </div>
         <button
           onClick={() => setShowCreateTourPopup(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.03] transition-all cursor-pointer"
         >
           Tạo Tour Mới
         </button>

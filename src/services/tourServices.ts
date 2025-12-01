@@ -12,12 +12,40 @@ export const tourServices = {
     return response.data;
   },
 
-  fetchToursByType: async (tourTypeId: number, page = 1, limit = 10) => {
-    const url = `${process.env.NEXT_PUBLIC_API_URL}/api/search-tours/search-by-type/${tourTypeId}?page=${page}&limit=${limit}`;
-    console.log(`🔗 Tour Type API URL: ${url}`);
+  searchToursByFields: async (params: {
+    tour_type_id?: number;
+    destination?: string;
+    departure?: string;
+    target_date?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const { page = 1, limit = 10, ...searchParams } = params;
+
+    const queryParams = new URLSearchParams();
+    queryParams.append("page", page.toString());
+    queryParams.append("limit", limit.toString());
+
+    if (searchParams.tour_type_id) {
+      queryParams.append("tour_type_id", searchParams.tour_type_id.toString());
+    }
+    if (searchParams.destination) {
+      queryParams.append("destination", searchParams.destination);
+    }
+    if (searchParams.departure) {
+      queryParams.append("departure", searchParams.departure);
+    }
+    if (searchParams.target_date) {
+      queryParams.append("target_date", searchParams.target_date);
+    }
+
+    const url = `${
+      process.env.NEXT_PUBLIC_API_URL
+    }/api/search-tours/search-by-fields/?${queryParams.toString()}`;
+    console.log(`🔗 Search Tours API URL: ${url}`);
 
     const response = await axios.get(url);
-    console.log(`📡 Tour Type API Response:`, response.data);
+    console.log(`📡 Search Tours API Response:`, response.data);
 
     return response.data;
   },

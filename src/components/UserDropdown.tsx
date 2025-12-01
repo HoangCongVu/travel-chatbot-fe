@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { userTokenManager } from "@/services/authServices";
-import { ClipboardList, LogOut, Settings } from "lucide-react";
+import { ClipboardList, LogOut, Settings, User } from "lucide-react";
 
 interface UserDropdownProps {
   userEmail: string;
@@ -36,7 +36,7 @@ export default function UserDropdown({
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 text-gray-700 hover:text-blue-400 transition-colors"
+        className="flex items-center space-x-2 text-gray-700 hover:text-blue-400 transition-colors cursor-pointer"
       >
         <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
           <span className="text-white text-sm font-medium">
@@ -63,8 +63,8 @@ export default function UserDropdown({
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-          <div className="px-4 py-2 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-900">{userEmail}</p>
+          <div className="px-4 py-2 border-b border-gray-200">
+            <p className="text-sx font-medium text-gray-900">{userEmail}</p>
             <p className="text-xs text-gray-500">Thành viên</p>
           </div>
 
@@ -74,21 +74,9 @@ export default function UserDropdown({
               // Navigate to profile (you can implement this later)
               console.log("Navigate to profile");
             }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
+            <User className="w-4 h-4" />
             <span>Thông tin cá nhân</span>
           </button>
 
