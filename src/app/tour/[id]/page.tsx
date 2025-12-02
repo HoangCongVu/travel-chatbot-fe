@@ -4,6 +4,7 @@ import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { tourServices } from "@/services/tourServices";
 import ChatPopup from "@/components/ChatPopup";
+import LoginPopup from "@/components/LoginPopup";
 import { userTokenManager } from "@/services/authServices";
 
 interface Tour {
@@ -46,6 +47,7 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
   const [activeTab, setActiveTab] = useState("details");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
   const router = useRouter();
   const requestMadeRef = useRef(false);
 
@@ -66,7 +68,7 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
     localStorage.removeItem("userData");
     setIsLoggedIn(false);
     setUserEmail("");
-    alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+    setShowLoginPopup(true);
   };
 
   useEffect(() => {
@@ -531,6 +533,13 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
         isLoggedIn={isLoggedIn}
         userEmail={userEmail}
         onTokenExpired={handleTokenExpired}
+      />
+
+      {/* Login Popup */}
+      <LoginPopup
+        isOpen={showLoginPopup}
+        onClose={() => setShowLoginPopup(false)}
+        onSwitchToRegister={() => {}}
       />
     </div>
   );

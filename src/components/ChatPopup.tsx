@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { chatServices } from "@/services/chatServices";
 import { userTokenManager } from "@/services/authServices";
+import { useSocket } from "@/contexts/SocketContext";
 
 interface Message {
   id: number;
@@ -32,6 +33,7 @@ export default function ChatPopup({
   userEmail = "",
   onTokenExpired,
 }: ChatPopupProps) {
+  const { socket, isConnected } = useSocket();
   const [showChatPopup, setShowChatPopup] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
@@ -68,6 +70,72 @@ export default function ChatPopup({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Socket.IO: Join chat room khi có currentChatId
+  useEffect(() => {
+    if (!currentChatId || !isConnected || !socket) return;
+
+    console.log("🔌 Joining chat room:", currentChatId);
+    socket.emit("join_chat", { chat_id: currentChatId });
+
+    return () => {
+      console.log("🔌 Leaving chat room:", currentChatId);
+      socket.emit("leave_chat", { chat_id: currentChatId });
+    };
+  }, [currentChatId, isConnected, socket]);
+
+  // Socket.IO: Listen for new messages
+  useEffect(() => {
+    if (!isConnected || !socket) return;
+
+    const handleNewMessage = (data: any) => {
+      console.log("📩 Received new message via socket:", data);
+
+      // Chỉ xử lý message nếu đang ở trong chat room đó
+      if (data.chat_id === currentChatId) {
+        // ✅ CHỈ NHẬN BOT/ASSISTANT MESSAGES - Không nhận user messages (đã có optimistic UI)
+        if (data.role === "assistant" || data.role === "admin") {
+          const newSocketMessage = {
+            id: Date.now(),
+            text: data.content,
+            isBot: true,
+            timestamp: new Date(data.created_at),
+          };
+
+          // Kiểm tra xem message đã tồn tại chưa (tránh duplicate)
+          setMessages((prev) => {
+            const exists = prev.some(
+              (msg) =>
+                msg.text === newSocketMessage.text &&
+                Math.abs(
+                  msg.timestamp.getTime() - newSocketMessage.timestamp.getTime()
+                ) < 1000
+            );
+
+            if (!exists) {
+              console.log(
+                "✅ Adding new message from socket:",
+                newSocketMessage.text
+              );
+              return [...prev, newSocketMessage];
+            }
+            console.log("⚠️ Message already exists, skipping");
+            return prev;
+          });
+        } else {
+          console.log("⏭️ Skipping user message (already in optimistic UI)");
+        }
+      }
+    };
+
+    console.log("👂 Setting up socket message listener");
+    socket.on("new_message", handleNewMessage);
+
+    return () => {
+      console.log("🔇 Removing socket message listener");
+      socket.off("new_message", handleNewMessage);
+    };
+  }, [currentChatId, isConnected, socket]); // ✅ BỎ onNewMessage, offNewMessage
 
   const showNotification = (
     type: "success" | "error" | "info",
@@ -225,7 +293,24 @@ export default function ChatPopup({
             chatId = createChatResponse.data.id;
             setCurrentChatId(chatId);
             console.log("Chat created successfully with ID:", chatId);
+
+            // ✅ JOIN ROOM NGAY SAU KHI TẠO CHAT (không đợi state update)
+            if (isConnected && chatId && socket) {
+              console.log("🔌 Joining chat room immediately:", chatId);
+              socket.emit("join_chat", { chat_id: chatId });
+
+              // ⏱️ ĐỢI 500ms để đảm bảo join room thành công
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              console.log("✅ Ready to send message after joining room");
+            }
           } else {
+            // Kiểm tra nếu token hết hạn
+            if (createChatResponse.tokenExpired && onTokenExpired) {
+              console.log("Token expired, logging out...");
+              setShowChatPopup(false);
+              onTokenExpired();
+              return;
+            }
             throw new Error(
               createChatResponse.error || "Failed to create chat"
             );
@@ -237,28 +322,44 @@ export default function ChatPopup({
         }
 
         console.log("Sending message to chatbot:", { chatId, messageText });
-        const botResponse = await chatServices.sendMessageToChatBot(
+
+        // ✅ Gửi message tới backend và CHỜ response
+        const sendResponse = await chatServices.sendMessageToChatBot(
           chatId,
           messageText
         );
 
-        if (botResponse.success) {
-          const botMessage = {
+        if (!sendResponse.success) {
+          console.error("Error sending message:", sendResponse.error);
+          // Hiển thị error nếu gửi thất bại
+          const errorMessage = {
             id: messages.length + 2,
-            text:
-              botResponse.botResponse ||
-              botResponse.data?.reply ||
-              "Xin lỗi, tôi không thể trả lời lúc này.",
+            text: "Xin lỗi, có lỗi xảy ra khi gửi tin nhắn. Vui lòng thử lại.",
             isBot: true,
             timestamp: new Date(),
           };
-
-          setMessages((prev) => [...prev, botMessage]);
-        } else {
-          throw new Error(botResponse.error || "Failed to get bot response");
+          setMessages((prev) => [...prev, errorMessage]);
         }
-      } catch (error) {
+
+        // Bot response sẽ được nhận qua Socket.IO event 'new_message'
+        console.log(
+          "✅ Message sent successfully, waiting for bot response via Socket.IO"
+        );
+      } catch (error: any) {
         console.error("Error in handleSendMessage:", error);
+
+        // Kiểm tra nếu lỗi liên quan đến token expired
+        if (
+          error?.message?.includes("Token expired") ||
+          error?.response?.status === 401
+        ) {
+          if (onTokenExpired) {
+            console.log("Token expired, logging out...");
+            setShowChatPopup(false);
+            onTokenExpired();
+            return;
+          }
+        }
 
         const errorMessage = {
           id: messages.length + 2,
@@ -476,6 +577,17 @@ export default function ChatPopup({
                     <h3 className="font-semibold text-xl">Travel AI</h3>
                   </div>
                 </div>
+                {/* Socket Status Indicator */}
+                <div className="flex items-center space-x-1 text-xs">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      isConnected ? "bg-green-400" : "bg-red-400"
+                    }`}
+                  ></div>
+                  {/* <span className="opacity-80">
+                    {isConnected ? "Đang kết nối" : "Mất kết nối"}
+                  </span> */}
+                </div>
                 <button
                   onClick={() => setShowChatPopup(false)}
                   className="text-white hover:text-blue-200 transition-colors cursor-pointer"
@@ -508,6 +620,16 @@ export default function ChatPopup({
                       >
                         <p className="text-sm whitespace-pre-wrap break-words">
                           {message.text}
+                        </p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            message.isBot ? "text-gray-500" : "text-blue-100"
+                          }`}
+                        >
+                          {message.timestamp.toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </p>
                       </div>
                       {!message.isBot && (

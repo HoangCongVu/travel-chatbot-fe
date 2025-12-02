@@ -60,6 +60,7 @@ export const chatServices = {
       };
     } catch (error: any) {
       console.error("Create user chat error:", error);
+      const status = error.response?.status;
       return {
         error:
           error.response?.data?.detail ||
@@ -67,7 +68,8 @@ export const chatServices = {
           error.message ||
           "Failed to create user chat",
         success: false,
-        status: error.response?.status,
+        status: status,
+        tokenExpired: status === 401,
       };
     }
   },

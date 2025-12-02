@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import { adminServices } from "@/services/adminServices";
 import { User } from "lucide-react";
+import { useSocket } from "@/contexts/SocketContext";
 
 export default function ChatManagementAdminComponent() {
+  const { socket, isConnected } = useSocket();
   const [chats, setChats] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -13,6 +15,9 @@ export default function ChatManagementAdminComponent() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userEmailCache, setUserEmailCache] = useState<Record<string, string>>(
+    {}
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [followUpEnabled, setFollowUpEnabled] = useState(false);
@@ -46,6 +51,165 @@ export default function ChatManagementAdminComponent() {
     fetchFollowUpStatus();
   }, []);
 
+  // Socket.IO: Join admin room khi connect
+  useEffect(() => {
+    if (!isConnected || !socket) return;
+
+    console.log("👮 [Admin] Joining admin room for real-time notifications");
+    socket.emit("join_admin_room");
+
+    return () => {
+      console.log("👮 [Admin] Leaving admin room");
+      socket.emit("leave_admin_room");
+    };
+  }, [isConnected, socket]);
+
+  // Socket.IO: Listen for admin notifications (new chats, messages)
+  useEffect(() => {
+    if (!isConnected || !socket) return;
+
+    const handleAdminNotification = (data: any) => {
+      console.log("📢 [Admin] Received admin notification:", data);
+
+      if (data.type === "new_message") {
+        const { chat_id, message } = data;
+
+        // Nếu đang ở trong chat đó, cập nhật messages
+        if (chat_id === selectedChat?.id) {
+          const newSocketMessage = {
+            id: message.id || Date.now(),
+            content: message.content,
+            role: message.role,
+            created_at: message.created_at,
+            timestamp: message.created_at,
+          };
+
+          setMessages((prev) => {
+            const exists = prev.some(
+              (msg) =>
+                msg.content === newSocketMessage.content &&
+                Math.abs(
+                  new Date(msg.created_at || msg.timestamp).getTime() -
+                    new Date(newSocketMessage.created_at).getTime()
+                ) < 1000
+            );
+
+            if (!exists) {
+              console.log("✅ [Admin] Adding message from notification");
+              return [...prev, newSocketMessage];
+            }
+            return prev;
+          });
+        }
+
+        // Cập nhật danh sách chat
+        setChats((prev) => {
+          const existingChatIndex = prev.findIndex(
+            (chat) => chat.id === chat_id
+          );
+
+          if (existingChatIndex !== -1) {
+            // Chat đã tồn tại, di chuyển lên đầu
+            const updatedChats = [...prev];
+            updatedChats[existingChatIndex] = {
+              ...updatedChats[existingChatIndex],
+              updated_at: message.created_at,
+            };
+
+            const [movedChat] = updatedChats.splice(existingChatIndex, 1);
+            console.log("📌 [Admin] Moving chat to top:", chat_id);
+            return [movedChat, ...updatedChats];
+          } else {
+            // Chat mới, fetch lại danh sách
+            console.log("🆕 [Admin] New chat detected, refreshing list");
+            fetchAllChats();
+            return prev;
+          }
+        });
+      }
+    };
+
+    console.log("👂 [Admin] Setting up admin notification listener");
+    socket.on("admin_notification", handleAdminNotification);
+
+    return () => {
+      console.log("🔇 [Admin] Removing admin notification listener");
+      socket.off("admin_notification", handleAdminNotification);
+    };
+  }, [selectedChat?.id, isConnected, socket]);
+
+  // Socket.IO: Join chat room khi có selectedChat
+  useEffect(() => {
+    if (!selectedChat?.id || !isConnected || !socket) return;
+
+    console.log("🔌 [Admin] Joining chat room:", selectedChat.id);
+    socket.emit("join_chat", { chat_id: selectedChat.id });
+
+    return () => {
+      console.log("🔌 [Admin] Leaving chat room:", selectedChat.id);
+      socket.emit("leave_chat", { chat_id: selectedChat.id });
+    };
+  }, [selectedChat?.id, isConnected, socket]);
+
+  // Socket.IO: Listen for new messages
+  useEffect(() => {
+    if (!isConnected || !socket) return;
+
+    const handleNewMessage = (data: any) => {
+      console.log("📩 [Admin] Received new message via socket:", data);
+
+      // Chỉ xử lý message nếu đang ở trong chat room đó
+      if (data.chat_id === selectedChat?.id) {
+        const newSocketMessage = {
+          id: data.id || Date.now(),
+          content: data.content,
+          role: data.role,
+          created_at: data.created_at,
+          timestamp: data.created_at,
+        };
+
+        // Kiểm tra xem message đã tồn tại chưa (tránh duplicate)
+        setMessages((prev) => {
+          const exists = prev.some(
+            (msg) =>
+              msg.content === newSocketMessage.content &&
+              Math.abs(
+                new Date(msg.created_at || msg.timestamp).getTime() -
+                  new Date(newSocketMessage.created_at).getTime()
+              ) < 1000
+          );
+
+          if (!exists) {
+            console.log(
+              "✅ [Admin] Adding new message from socket:",
+              newSocketMessage.content
+            );
+            return [...prev, newSocketMessage];
+          }
+          console.log("⚠️ [Admin] Message already exists, skipping");
+          return prev;
+        });
+      }
+
+      // Cập nhật updated_at của chat trong danh sách
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === data.chat_id
+            ? { ...chat, updated_at: data.created_at }
+            : chat
+        )
+      );
+    };
+
+    console.log("👂 [Admin] Setting up socket message listener");
+    socket.on("new_message", handleNewMessage);
+
+    return () => {
+      console.log("🔇 [Admin] Removing socket message listener");
+      socket.off("new_message", handleNewMessage);
+    };
+  }, [selectedChat?.id, isConnected, socket]);
+
   const fetchAllChats = async () => {
     try {
       setLoading(true);
@@ -58,6 +222,40 @@ export default function ChatManagementAdminComponent() {
           );
         });
         setChats(sortedChats);
+
+        // Fetch user emails for all chats that have user_id
+        const userIds = [
+          ...new Set(
+            sortedChats
+              .map((chat: any) => chat.user_id)
+              .filter((id: any) => id && !userEmailCache[id])
+          ),
+        ] as string[];
+
+        if (userIds.length > 0) {
+          const emailPromises = userIds.map(async (userId: string) => {
+            try {
+              const userResponse = await adminServices.getUserById(userId);
+              if (userResponse.success && userResponse.data) {
+                return { userId, email: userResponse.data.email };
+              }
+            } catch (error) {
+              console.error(`Error fetching user ${userId}:`, error);
+            }
+            return null;
+          });
+
+          const results = await Promise.all(emailPromises);
+          const newEmailCache: Record<string, string> = {};
+
+          results.forEach((result) => {
+            if (result) {
+              newEmailCache[result.userId] = result.email;
+            }
+          });
+
+          setUserEmailCache((prev) => ({ ...prev, ...newEmailCache }));
+        }
       } else {
         showNotification("error", "Không thể tải danh sách chat");
       }
@@ -141,30 +339,50 @@ export default function ChatManagementAdminComponent() {
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) return;
 
+    const messageText = newMessage.trim();
+
+    // Hiển thị message ngay (optimistic update)
+    const optimisticMessage = {
+      id: Date.now(),
+      content: messageText,
+      role: "admin",
+      sender: "admin",
+      created_at: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setNewMessage("");
+
     try {
       setSendingMessage(true);
+      console.log("📤 [Admin] Sending message:", {
+        chatId: selectedChat.id,
+        content: messageText,
+      });
+
       const response = await adminServices.sendAdminMessage(
         selectedChat.id,
-        newMessage
+        messageText
       );
 
       if (response.success) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            content: newMessage,
-            sender: "admin",
-            timestamp: new Date().toISOString(),
-          },
-        ]);
-        setNewMessage("");
+        console.log("✅ [Admin] Message sent successfully");
         showNotification("success", "Tin nhắn đã được gửi");
+        // Message sẽ được cập nhật qua Socket.IO
       } else {
+        // Nếu gửi thất bại, xóa optimistic message
+        setMessages((prev) =>
+          prev.filter((msg) => msg.id !== optimisticMessage.id)
+        );
         showNotification("error", response.error || "Không thể gửi tin nhắn");
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      // Nếu có lỗi, xóa optimistic message
+      setMessages((prev) =>
+        prev.filter((msg) => msg.id !== optimisticMessage.id)
+      );
       showNotification("error", "Có lỗi xảy ra khi gửi tin nhắn");
     } finally {
       setSendingMessage(false);
@@ -274,7 +492,20 @@ export default function ChatManagementAdminComponent() {
       <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Tin nhắn</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">Tin nhắn</h2>
+              {/* Socket Status Indicator */}
+              <div className="flex items-center space-x-1.5 px-2 py-1 bg-gray-50 rounded-lg">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+                  }`}
+                ></div>
+                <span className="text-xs text-gray-600">
+                  {isConnected ? "Live" : "Offline"}
+                </span>
+              </div>
+            </div>
             <button
               onClick={handleToggleFollowUp}
               disabled={loadingFollowUp || followUpStatusLoading}
@@ -301,8 +532,7 @@ export default function ChatManagementAdminComponent() {
                 </>
               )}
             </button>
-          </div>
-
+          </div>{" "}
           <div className="relative">
             <input
               type="text"
@@ -365,13 +595,15 @@ export default function ChatManagementAdminComponent() {
                   <div className="flex items-start space-x-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-semibold text-sm">
-                        {chat.user_email?.[0]?.toUpperCase() || <User />}
+                        <User />
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <h3 className="text-sm font-medium text-gray-900 truncate">
-                          {chat.title || "Untitled Chat"}
+                          {userEmailCache[chat.user_id] ||
+                            chat.platform ||
+                            "Anonymous"}
                         </h3>
                         <span className="text-xs text-gray-500">
                           {new Date(chat.updated_at).toLocaleDateString(
@@ -379,8 +611,8 @@ export default function ChatManagementAdminComponent() {
                           )}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">
-                        {chat.user_id || chat.platform || "Anonymous"}
+                      <p className="text-xs text-gray-600 truncate">
+                        {chat.title || "Untitled Chat"}
                       </p>
                     </div>
                   </div>
@@ -423,17 +655,17 @@ export default function ChatManagementAdminComponent() {
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-semibold">
-                    {selectedChat.user_email?.[0]?.toUpperCase() || <User />}
+                    <User />
                   </span>
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">
-                    {selectedChat.title || "Untitled Chat"}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {selectedChat.user_id ||
+                    {userEmailCache[selectedChat.user_id] ||
                       selectedChat.platform ||
                       "Anonymous"}
+                  </h3>
+                  <p className="text-sm text-gray-700">
+                    {selectedChat.title || "Untitled Chat"}
                   </p>
                 </div>
               </div>

@@ -150,6 +150,42 @@ export const adminServices = {
     }
   },
 
+  // Get user by ID
+  getUserById: async (userId: string) => {
+    try {
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/users/${userId}`,
+        {
+          headers: tokenManager.getAuthHeader(),
+        }
+      );
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error: any) {
+      console.error(`Get user ${userId} failed:`, error);
+
+      if (
+        error.response &&
+        error.response.status === 401 &&
+        (error.response.data.detail === "Token expired" ||
+          error.response.data.detail === "Could not validate credentials")
+      ) {
+        tokenManager.removeToken();
+        window.location.href = "/admin/login";
+      }
+
+      return {
+        success: false,
+        error:
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          "Failed to get user",
+      };
+    }
+  },
+
   fetchAllFiles: async () => {
     try {
       const response = await axios.get(
