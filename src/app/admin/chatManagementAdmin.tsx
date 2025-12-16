@@ -5,7 +5,13 @@ import { adminServices } from "@/services/adminServices";
 import { User } from "lucide-react";
 import { useSocket } from "@/contexts/SocketContext";
 
-export default function ChatManagementAdminComponent() {
+interface ChatManagementProps {
+  userRole?: "admin" | "staff";
+}
+
+export default function ChatManagementAdminComponent({
+  userRole = "admin",
+}: ChatManagementProps) {
   const { socket, isConnected } = useSocket();
   const [chats, setChats] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<any | null>(null);
@@ -345,8 +351,8 @@ export default function ChatManagementAdminComponent() {
     const optimisticMessage = {
       id: Date.now(),
       content: messageText,
-      role: "admin",
-      sender: "admin",
+      role: userRole,
+      sender: userRole,
       created_at: new Date().toISOString(),
       timestamp: new Date().toISOString(),
     };
@@ -356,18 +362,18 @@ export default function ChatManagementAdminComponent() {
 
     try {
       setSendingMessage(true);
-      console.log("📤 [Admin] Sending message:", {
+      console.log(`📤 [${userRole.toUpperCase()}] Sending message:`, {
         chatId: selectedChat.id,
         content: messageText,
       });
 
-      const response = await adminServices.sendAdminMessage(
-        selectedChat.id,
-        messageText
-      );
+      const response =
+        userRole === "staff"
+          ? await adminServices.sendStaffMessage(selectedChat.id, messageText)
+          : await adminServices.sendAdminMessage(selectedChat.id, messageText);
 
       if (response.success) {
-        console.log("✅ [Admin] Message sent successfully");
+        console.log(`✅ [${userRole.toUpperCase()}] Message sent successfully`);
         showNotification("success", "Tin nhắn đã được gửi");
         // Message sẽ được cập nhật qua Socket.IO
       } else {

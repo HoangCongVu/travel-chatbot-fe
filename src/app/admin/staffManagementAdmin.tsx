@@ -11,24 +11,23 @@ import {
   Info,
 } from "lucide-react";
 
-// User Management Component
-export default function UserManagementAdminComponent() {
-  const [users, setUsers] = useState([]);
+// Staff Management Component
+export default function StaffManagementAdminComponent() {
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [deletingStaffId, setDeletingStaffId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<{
+  const [staffToDelete, setStaffToDelete] = useState<{
     id: string;
     name: string;
   } | null>(null);
 
-  // Create user state
+  // Create staff state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createFormData, setCreateFormData] = useState({
     fullName: "",
-    phoneNumber: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -52,78 +51,80 @@ export default function UserManagementAdminComponent() {
     }, 3000);
   };
 
-  // Fetch users from API
-  const fetchUsers = async () => {
+  // Fetch staff from API
+  const fetchStaff = async () => {
     try {
       setLoading(true);
-      console.log("Fetching users from Next.js API route");
+      console.log("Fetching staff from Next.js API route");
 
-      const data = await adminServices.fetchAllUsers();
+      const data = await adminServices.fetchAllStaff();
 
       if (!data) {
-        throw new Error("Failed to fetch users");
+        throw new Error("Failed to fetch staff");
       }
 
       // Transform API data to match UI format
-      const transformedUsers = data.map((user: any) => ({
-        id: user.id,
-        name: user.full_name,
-        email: user.email,
-        phone: user.phone_number,
-        joinDate: new Date(user.created_at).toLocaleDateString("vi-VN"),
-        status: "Active", // Default status since API doesn't provide this
+      const transformedStaff = data.map((staffMember: any) => ({
+        id: staffMember.id,
+        name: staffMember.full_name,
+        email: staffMember.email,
+        role: staffMember.role,
+        joinDate: new Date(staffMember.created_at).toLocaleDateString("vi-VN"),
+        status: "Active", // Default status
       }));
 
-      setUsers(transformedUsers);
+      setStaff(transformedStaff);
     } catch (error: any) {
-      console.error("Error fetching users:", error);
-      setError(error.message || "Lỗi khi tải danh sách người dùng");
+      console.error("Error fetching staff:", error);
+      setError(error.message || "Lỗi khi tải danh sách nhân viên");
     } finally {
       setLoading(false);
     }
   };
 
   // Show delete confirmation popup
-  const showDeleteConfirmation = (userId: string, userName: string) => {
-    setUserToDelete({ id: userId, name: userName });
+  const showDeleteConfirmation = (staffId: string, staffName: string) => {
+    setStaffToDelete({ id: staffId, name: staffName });
     setShowDeleteConfirm(true);
   };
 
-  // Delete user function
-  const handleDeleteUser = async () => {
-    if (!userToDelete) return;
+  // Delete staff function
+  const handleDeleteStaff = async () => {
+    if (!staffToDelete) return;
 
     try {
-      setDeletingUserId(userToDelete.id);
-      await adminServices.deleteUser(userToDelete.id);
+      setDeletingStaffId(staffToDelete.id);
+      await adminServices.deleteStaff(staffToDelete.id);
 
-      // Remove user from local state
-      setUsers((prevUsers) =>
-        prevUsers.filter((user: any) => user.id !== userToDelete.id)
+      // Remove staff from local state
+      setStaff((prevStaff) =>
+        prevStaff.filter(
+          (staffMember: any) => staffMember.id !== staffToDelete.id
+        )
       );
 
       // Close popup and reset state
       setShowDeleteConfirm(false);
-      setUserToDelete(null);
+      setStaffToDelete(null);
 
       // Show success notification
-      showNotification("success", "Xóa user thành công!");
+      showNotification("success", "Xóa staff thành công!");
     } catch (error: any) {
-      console.error("Error deleting user:", error);
-      showNotification("error", error.message || "Lỗi khi xóa người dùng");
+      console.error("Error deleting staff:", error);
+      showNotification("error", error.message || "Lỗi khi xóa nhân viên");
     } finally {
-      setDeletingUserId(null);
+      setDeletingStaffId(null);
     }
   };
 
   // Cancel delete
   const cancelDelete = () => {
     setShowDeleteConfirm(false);
-    setUserToDelete(null);
+    setStaffToDelete(null);
   };
 
-  // Create user functions
-  const handleCreateUser = async (e: React.FormEvent) => {
+  // Create staff functions
+  const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate password confirmation
@@ -135,35 +136,33 @@ export default function UserManagementAdminComponent() {
     setIsCreating(true);
 
     try {
-      const result = await adminServices.createUser(
+      const result = await adminServices.createStaff(
         createFormData.fullName,
-        createFormData.phoneNumber,
         createFormData.email,
         createFormData.password
       );
 
       if (result) {
-        // Refresh users list
-        await fetchUsers();
+        // Refresh staff list
+        await fetchStaff();
 
         // Close popup and reset form
         setIsCreateModalOpen(false);
         setCreateFormData({
           fullName: "",
-          phoneNumber: "",
           email: "",
           password: "",
           confirmPassword: "",
         });
 
         // Show success notification
-        showNotification("success", "Tạo user thành công!");
+        showNotification("success", "Tạo staff thành công!");
       }
     } catch (error: any) {
-      console.error("Error creating user:", error);
+      console.error("Error creating staff:", error);
       showNotification(
         "error",
-        error.response?.data?.detail || error.message || "Lỗi khi tạo user"
+        error.response?.data?.detail || error.message || "Lỗi khi tạo staff"
       );
     } finally {
       setIsCreating(false);
@@ -182,7 +181,6 @@ export default function UserManagementAdminComponent() {
     setIsCreateModalOpen(false);
     setCreateFormData({
       fullName: "",
-      phoneNumber: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -190,7 +188,7 @@ export default function UserManagementAdminComponent() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchStaff();
   }, []);
 
   // Show loading state
@@ -199,14 +197,14 @@ export default function UserManagementAdminComponent() {
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-900">
-            User Management
+            Staff Management
           </h2>
         </div>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">
-              Đang tải danh sách người dùng...
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
+            <p className="mt-2 text-gray-600">
+              Đang tải danh sách nhân viên...
             </p>
           </div>
         </div>
@@ -220,35 +218,35 @@ export default function UserManagementAdminComponent() {
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-900">
-            User Management
+            Staff Management
           </h2>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex">
+        <div className="text-center py-12">
+          <div className="text-red-600 mb-4">
             <svg
-              className="h-5 w-5 text-red-400"
-              fill="currentColor"
-              viewBox="0 0 20 20"
+              className="w-16 h-16 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
               <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">
-                Lỗi tải dữ liệu
-              </h3>
-              <p className="mt-1 text-sm text-red-700">{error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="mt-2 text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded"
-              >
-                Thử lại
-              </button>
-            </div>
           </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Có lỗi xảy ra
+          </h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchStaff}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Thử lại
+          </button>
         </div>
       </div>
     );
@@ -307,113 +305,139 @@ export default function UserManagementAdminComponent() {
         </div>
       )}
 
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">
-            User Management
+            Staff Management
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Tổng cộng: {users.length} người dùng
+            Tổng cộng: {staff.length} nhân viên
           </p>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium"
         >
-          Tạo User
+          Tạo Staff
         </button>
       </div>
 
-      {users.length === 0 ? (
-        <div className="text-center py-12">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1"
-              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            Chưa có người dùng nào
+      {/* Staff Table */}
+      {staff.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-lg border">
+          <div className="text-gray-400 mb-4">
+            <svg
+              className="w-16 h-16 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Chưa có nhân viên nào
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Bắt đầu bằng cách thêm người dùng mới.
+          <p className="text-gray-600">
+            Danh sách nhân viên sẽ hiển thị ở đây khi có dữ liệu.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tên
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SĐT
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ngày tham gia
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng thái
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user: any) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {user.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.phone}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.joinDate}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {/* <button className="text-blue-600 hover:text-blue-900 mr-3">
-                      Sửa
-                    </button> */}
-                    <button
-                      onClick={() => showDeleteConfirmation(user.id, user.name)}
-                      className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={deletingUserId === user.id}
-                    >
-                      {deletingUserId === user.id ? (
-                        <div className="flex items-center">
-                          <Loader2 className="animate-spin h-4 w-4 mr-1" />
-                          Đang xóa...
-                        </div>
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </button>
-                  </td>
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Nhân viên
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Vai trò
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ngày tham gia
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Trạng thái
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hành động
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {staff.map((staffMember: any) => (
+                  <tr key={staffMember.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                            <span className="text-white text-sm font-medium">
+                              {staffMember.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {staffMember.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            ID: {staffMember.id.substring(0, 8)}...
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {staffMember.email}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                        {staffMember.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {staffMember.joinDate}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                        {staffMember.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() =>
+                          showDeleteConfirmation(
+                            staffMember.id,
+                            staffMember.name
+                          )
+                        }
+                        disabled={deletingStaffId === staffMember.id}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center w-8 h-8 rounded-full hover:bg-red-50 transition-colors ml-auto"
+                        title="Xóa nhân viên"
+                      >
+                        {deletingStaffId === staffMember.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -442,9 +466,9 @@ export default function UserManagementAdminComponent() {
 
             <div className="mb-6">
               <p className="text-gray-600">
-                Bạn có chắc chắn muốn xóa người dùng{" "}
+                Bạn có chắc chắn muốn xóa nhân viên{" "}
                 <span className="font-semibold text-gray-900">
-                  "{userToDelete?.name}"
+                  "{staffToDelete?.name}"
                 </span>
                 ?
               </p>
@@ -457,16 +481,16 @@ export default function UserManagementAdminComponent() {
               <button
                 onClick={cancelDelete}
                 className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                disabled={deletingUserId !== null}
+                disabled={deletingStaffId !== null}
               >
                 Hủy
               </button>
               <button
-                onClick={handleDeleteUser}
+                onClick={handleDeleteStaff}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                disabled={deletingUserId !== null}
+                disabled={deletingStaffId !== null}
               >
-                {deletingUserId ? (
+                {deletingStaffId ? (
                   <>
                     <Loader2 className="animate-spin h-4 w-4 mr-2" />
                     Đang xóa...
@@ -480,132 +504,75 @@ export default function UserManagementAdminComponent() {
         </div>
       )}
 
-      {/* Create User Modal */}
+      {/* Create Staff Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-black/30 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Tạo User Mới
-              </h3>
-              <button
-                onClick={cancelCreate}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateUser} className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Tạo Staff Mới
+            </h3>
+            <form onSubmit={handleCreateStaff} className="space-y-4">
               <div>
-                <label
-                  htmlFor="fullName"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Họ và tên *
                 </label>
                 <input
                   type="text"
-                  id="fullName"
                   name="fullName"
                   value={createFormData.fullName}
                   onChange={handleCreateFormChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Nhập họ và tên"
                 />
               </div>
-
               <div>
-                <label
-                  htmlFor="phoneNumber"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Số điện thoại *
-                </label>
-                <input
-                  type="tel"
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={createFormData.phoneNumber}
-                  onChange={handleCreateFormChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email *
                 </label>
                 <input
                   type="email"
-                  id="email"
                   name="email"
                   value={createFormData.email}
                   onChange={handleCreateFormChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Nhập email"
                 />
               </div>
-
               <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Mật khẩu *
                 </label>
                 <input
                   type="password"
-                  id="password"
                   name="password"
                   value={createFormData.password}
                   onChange={handleCreateFormChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
-                  minLength={6}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Nhập mật khẩu"
                 />
               </div>
-
               <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Xác nhận mật khẩu *
                 </label>
                 <input
                   type="password"
-                  id="confirmPassword"
                   name="confirmPassword"
                   value={createFormData.confirmPassword}
                   onChange={handleCreateFormChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   required
-                  minLength={6}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Nhập lại mật khẩu"
                 />
               </div>
-
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={cancelCreate}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Hủy
                 </button>
@@ -620,7 +587,7 @@ export default function UserManagementAdminComponent() {
                       Đang tạo...
                     </>
                   ) : (
-                    "Tạo User"
+                    "Tạo Staff"
                   )}
                 </button>
               </div>

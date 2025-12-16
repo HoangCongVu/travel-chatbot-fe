@@ -71,6 +71,11 @@ export const adminServices = {
       if (response.data.access_token) {
         // Save token to localStorage
         tokenManager.setToken(response.data.access_token);
+
+        // Save role to localStorage
+        if (response.data.role) {
+          localStorage.setItem("role", response.data.role);
+        }
       }
 
       return {
@@ -102,6 +107,7 @@ export const adminServices = {
   // Admin logout
   logout: () => {
     tokenManager.removeToken();
+    localStorage.removeItem("role"); // Changed from "user_role" to "role"
     return { success: true };
   },
   fetchAllUsers: async () => {
@@ -533,6 +539,165 @@ export const adminServices = {
           error.response?.data?.message ||
           "Failed to send message",
       };
+    }
+  },
+
+  // Send staff message to user
+  sendStaffMessage: async (chatId: string, message: string) => {
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/chats/${chatId}/staff-message`,
+        { content: message },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...tokenManager.getAuthHeader(),
+          },
+        }
+      );
+
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error: any) {
+      console.error("Send staff message failed:", error);
+
+      if (
+        error.response &&
+        error.response.status === 401 &&
+        (error.response.data.detail === "Token expired" ||
+          error.response.data.detail === "Could not validate credentials")
+      ) {
+        tokenManager.removeToken();
+        window.location.href = "/staff/login";
+      }
+
+      return {
+        success: false,
+        error:
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          "Failed to send message",
+      };
+    }
+  },
+
+  // Staff Management APIs
+  fetchAllStaff: async () => {
+    try {
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admins/staff`,
+        {
+          headers: tokenManager.getAuthHeader(),
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (
+        error.response &&
+        error.response.status === 401 &&
+        (error.response.data.detail === "Token expired" ||
+          error.response.data.detail === "Could not validate credentials")
+      ) {
+        tokenManager.removeToken();
+        window.location.href = "/admin/login";
+      }
+      throw error;
+    }
+  },
+
+  deleteStaff: async (staffId: string) => {
+    try {
+      const response = await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admins/staff/${staffId}`,
+        {
+          headers: tokenManager.getAuthHeader(),
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (
+        error.response &&
+        error.response.status === 401 &&
+        (error.response.data.detail === "Token expired" ||
+          error.response.data.detail === "Could not validate credentials")
+      ) {
+        tokenManager.removeToken();
+        window.location.href = "/admin/login";
+      }
+      throw error;
+    }
+  },
+
+  // Create user
+  createUser: async (
+    fullName: string,
+    phoneNumber: string,
+    email: string,
+    password: string
+  ) => {
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/users/create`,
+        {
+          full_name: fullName,
+          phone_number: phoneNumber,
+          email,
+          password,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...tokenManager.getAuthHeader(),
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (
+        error.response &&
+        error.response.status === 401 &&
+        (error.response.data.detail === "Token expired" ||
+          error.response.data.detail === "Could not validate credentials")
+      ) {
+        tokenManager.removeToken();
+        window.location.href = "/admin/login";
+      }
+      throw error;
+    }
+  },
+
+  // Create staff
+  createStaff: async (fullName: string, email: string, password: string) => {
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admins`,
+        {
+          full_name: fullName,
+          email: email,
+          password: password,
+          role: "staff",
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...tokenManager.getAuthHeader(),
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (
+        error.response &&
+        error.response.status === 401 &&
+        (error.response.data.detail === "Token expired" ||
+          error.response.data.detail === "Could not validate credentials")
+      ) {
+        tokenManager.removeToken();
+        window.location.href = "/admin/login";
+      }
+      throw error;
     }
   },
 };

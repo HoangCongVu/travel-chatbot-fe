@@ -6,9 +6,11 @@ import LoginPopup from "@/components/LoginPopup";
 import RegisterPopup from "@/components/RegisterPopup";
 import UserDropdown from "@/components/UserDropdown";
 import ChatPopup from "@/components/ChatPopup";
+import CartPopup from "@/components/CartPopup";
 import { tourServices } from "@/services/tourServices";
 import { userTokenManager } from "@/services/authServices";
-import { ScanSearch, User } from "lucide-react";
+import { cartServices, cartStorage } from "@/services/cartServices";
+import { ScanSearch, User, ShoppingCart } from "lucide-react";
 
 // Define tour type based on actual API structure
 interface Tour {
@@ -83,6 +85,8 @@ export default function Home() {
     message: string;
     onConfirm: () => void;
   }>({ show: false, title: "", message: "", onConfirm: () => {} });
+  const [showCartPopup, setShowCartPopup] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0);
 
   // Check for login/register success
   useEffect(() => {
@@ -136,6 +140,19 @@ export default function Home() {
     }, 500);
   };
 
+  // Load cart item count
+  const loadCartCount = async () => {
+    const cartId = cartStorage.getCartId();
+    if (!cartId) return;
+
+    try {
+      const total = await cartServices.getCartTotal(cartId);
+      setCartItemCount(total.total_items);
+    } catch (error) {
+      console.error("❌ Error loading cart count:", error);
+    }
+  };
+
   // Check authentication status on component mount
   useEffect(() => {
     const token = userTokenManager.getToken();
@@ -144,7 +161,14 @@ export default function Home() {
       setIsLoggedIn(true);
       setUserEmail(email);
     }
+    // Load cart count
+    loadCartCount();
   }, []);
+
+  // Reload cart count when user logs in/out
+  useEffect(() => {
+    loadCartCount();
+  }, [isLoggedIn]);
 
   // Fetch tours from API
   useEffect(() => {
@@ -508,6 +532,21 @@ export default function Home() {
                 GIỚI THIỆU
               </a>{" "}
               <div className="flex items-center space-x-6">
+                {/* Cart Icon */}
+                <button
+                  onClick={() => setShowCartPopup(true)}
+                  className="relative flex items-center text-gray-700 space-x-1 hover:text-blue-400 cursor-pointer transition-colors"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  {cartItemCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {cartItemCount}
+                    </span>
+                  )}
+                  <span>Giỏ hàng</span>
+                </button>
+
+                {/* User Account */}
                 {isLoggedIn ? (
                   <UserDropdown userEmail={userEmail} onLogout={handleLogout} />
                 ) : (
@@ -1182,6 +1221,12 @@ export default function Home() {
           </div>
         </div>
       </div>
+      {/* Cart Popup Component */}
+      <CartPopup
+        isOpen={showCartPopup}
+        onClose={() => setShowCartPopup(false)}
+        onCartUpdate={loadCartCount}
+      />
       {/* Login Popup */}
       <LoginPopup
         isOpen={showLoginPopup}

@@ -5,7 +5,7 @@ import { adminServices } from "@/services/adminServices";
 import { useRouter } from "next/navigation";
 import { CheckCircle, XCircle } from "lucide-react";
 
-export default function LoginAdminForm() {
+export default function LoginStaffForm() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -31,9 +31,9 @@ export default function LoginAdminForm() {
 
   useEffect(() => {
     // Check if user just logged out
-    const logoutSuccess = localStorage.getItem("admin_logout_success");
+    const logoutSuccess = localStorage.getItem("staff_logout_success");
     if (logoutSuccess === "true") {
-      localStorage.removeItem("admin_logout_success");
+      localStorage.removeItem("staff_logout_success");
       showNotification("logout", "Đăng xuất thành công!");
     }
   }, []);
@@ -50,25 +50,29 @@ export default function LoginAdminForm() {
     setLoading(true);
 
     try {
-      console.log("Admin login attempt:", formData);
+      console.log("Staff login attempt:", formData);
 
-      // Call admin login API
+      // Call admin login API (same API, different role check)
       const res = await adminServices.login(formData.email, formData.password);
-      console.log("Admin login response:", res);
+      console.log("Staff login response:", res);
 
       if (res.success) {
-        // Check if user has admin role
-        if (res.role === "admin") {
+        // Get role from localStorage (saved by adminServices.login)
+        const userRole = localStorage.getItem("role");
+        console.log("User role from localStorage:", userRole);
+
+        // Check if user has staff role
+        if (res.role === "staff") {
           showNotification("success", "Đăng nhập thành công!");
           setTimeout(() => {
-            router.push("/admin");
+            router.push("/staff");
           }, 500);
         } else {
           // Wrong role
           adminServices.logout(); // Clear token and role
           showNotification(
             "error",
-            "Bạn không có quyền truy cập vào trang Admin. Vui lòng đăng nhập bằng tài khoản Admin."
+            "Bạn không có quyền truy cập vào trang Staff. Vui lòng đăng nhập bằng tài khoản Staff."
           );
         }
       } else {
@@ -141,9 +145,12 @@ export default function LoginAdminForm() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Chào mừng bạn đến với
+            Chào mừng Staff đến với
           </h1>
-          <h2 className="text-3xl font-bold text-gray-900"></h2>
+          <div className="text-4xl font-bold flex items-center justify-center gap-2">
+            <span className="text-blue-500">TravelAI</span>
+            <span className="text-gray-700">Staff Portal</span>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-8">
@@ -280,12 +287,12 @@ export default function LoginAdminForm() {
 
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            Chưa có tài khoản?{" "}
+            Cần hỗ trợ?{" "}
             <a
-              href="/sign-up"
+              href="#"
               className="text-blue-600 hover:text-blue-500 font-medium"
             >
-              Đăng ký ngay
+              Liên hệ Admin
             </a>
           </p>
         </div>

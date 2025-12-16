@@ -3,9 +3,12 @@
 import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { tourServices } from "@/services/tourServices";
+import { cartServices, cartStorage } from "@/services/cartServices";
 import ChatPopup from "@/components/ChatPopup";
+import CartPopup from "@/components/CartPopup";
 import LoginPopup from "@/components/LoginPopup";
 import { userTokenManager } from "@/services/authServices";
+import { ShoppingCart } from "lucide-react";
 
 interface Tour {
   tour_id?: string;
@@ -48,6 +51,12 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartMessage, setCartMessage] = useState("");
+  const [showCartPopup, setShowCartPopup] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0);
   const router = useRouter();
   const requestMadeRef = useRef(false);
 
@@ -59,7 +68,27 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
       setIsLoggedIn(true);
       setUserEmail(email);
     }
+
+    // Set default date to today
+    const today = new Date().toISOString().split("T")[0];
+    setSelectedDate(today);
+
+    // Load cart count
+    loadCartCount();
   }, []);
+
+  // Load cart item count
+  const loadCartCount = async () => {
+    const cartId = cartStorage.getCartId();
+    if (!cartId) return;
+
+    try {
+      const total = await cartServices.getCartTotal(cartId);
+      setCartItemCount(total.total_items);
+    } catch (error) {
+      console.error("❌ Error loading cart count:", error);
+    }
+  };
 
   // Handle token expiration
   const handleTokenExpired = () => {
@@ -159,6 +188,55 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
     })(),
   };
 
+  // Handle add to cart
+  const handleAddToCart = async () => {
+    if (!selectedDate) {
+      setCartMessage("⚠️ Vui lòng chọn ngày khởi hành");
+      setTimeout(() => setCartMessage(""), 3000);
+      return;
+    }
+
+    try {
+      setAddingToCart(true);
+      setCartMessage("");
+
+      // Get userId if logged in
+      const userData = localStorage.getItem("userData");
+      const userId = userData ? JSON.parse(userData).user_id : undefined;
+
+      // Initialize cart (tạo mới nếu chưa có)
+      const cartId = await cartStorage.initializeCart(userId);
+      console.log("🛒 Cart ID:", cartId);
+
+      // Add to cart
+      await cartServices.addToCart({
+        cart_id: cartId,
+        tour_id: tour.tour_id || resolvedParams.id,
+        tour_name: tour.tour_name,
+        travel_date: selectedDate,
+        quantity: quantity,
+      });
+
+      setCartMessage("✅ Đã thêm vào giỏ hàng thành công!");
+      setTimeout(() => setCartMessage(""), 3000);
+
+      // Reload cart count
+      await loadCartCount();
+    } catch (error) {
+      console.error("❌ Error adding to cart:", error);
+      setCartMessage("❌ Có lỗi xảy ra, vui lòng thử lại");
+      setTimeout(() => setCartMessage(""), 3000);
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  // Increase/Decrease quantity
+  const increaseQuantity = () => setQuantity((prev) => prev + 1);
+  const decreaseQuantity = () => {
+    if (quantity > 1) setQuantity((prev) => prev - 1);
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header Navigation */}
@@ -219,8 +297,22 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
               </a>
             </nav>
 
-            {/* Right side with Back button */}
+            {/* Right side with Cart and Back button */}
             <div className="flex items-center space-x-4">
+              {/* Cart Icon */}
+              <button
+                onClick={() => setShowCartPopup(true)}
+                className="relative flex items-center text-gray-700 space-x-1 hover:text-blue-400 cursor-pointer transition-colors"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
+                <span>Giỏ hàng</span>
+              </button>
+
               <button
                 onClick={() => router.back()}
                 className="flex items-center text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors cursor-pointer"
@@ -446,10 +538,25 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
               <div className="text-center">
                 <p className="text-2xl font-bold">
                   Giá từ:
-                  {tour.price_by_packages?.[0]?.price
-                    ? tour.price_by_packages[0].price.toLocaleString("vi-VN") +
-                      " đ"
-                    : "Liên hệ"}
+                  {(() => {
+                    if (
+                      tour.price_by_packages &&
+                      tour.price_by_packages.length > 0
+                    ) {
+                      return `${tour.price_by_packages[0].price.toLocaleString(
+                        "vi-VN"
+                      )} đ`;
+                    } else if (
+                      tour.price_by_dates &&
+                      tour.price_by_dates.length > 0
+                    ) {
+                      return `${tour.price_by_dates[0].price.toLocaleString(
+                        "vi-VN"
+                      )} đ`;
+                    } else {
+                      return "Liên hệ";
+                    }
+                  })()}
                 </p>
               </div>
             </div>
@@ -481,20 +588,96 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
               </div>
             </div>
 
+            {/* Quantity Selector */}
+            <div className="mb-6">
+              <h4 className="font-bold text-gray-800 mb-3">Số lượng người:</h4>
+              <div className="flex items-center justify-center space-x-4">
+                <button
+                  onClick={decreaseQuantity}
+                  disabled={quantity <= 1}
+                  className="w-10 h-10 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed rounded-full flex items-center justify-center font-bold text-xl transition-colors"
+                >
+                  −
+                </button>
+                <span className="text-2xl font-bold text-gray-800 min-w-[50px] text-center">
+                  {quantity}
+                </span>
+                <button
+                  onClick={increaseQuantity}
+                  className="w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xl transition-colors"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
             {/* Booking Date */}
             <div className="mb-6">
+              <h4 className="font-bold text-gray-800 mb-3">Ngày khởi hành:</h4>
               <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg">
                 <input
                   type="date"
-                  defaultValue="2025-11-09"
-                  className="w-full bg-white text-gray-800 p-3 rounded border-none text-center font-medium"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  className="w-full bg-white text-gray-800 p-3 rounded border-none text-center font-medium cursor-pointer"
                 />
               </div>
             </div>
 
-            {/* Book Button */}
+            {/* Cart Message */}
+            {cartMessage && (
+              <div
+                className={`mb-4 p-3 rounded-lg text-center font-medium ${
+                  cartMessage.includes("✅")
+                    ? "bg-green-100 text-green-700 border border-green-300"
+                    : cartMessage.includes("⚠️")
+                    ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                    : "bg-red-100 text-red-700 border border-red-300"
+                }`}
+              >
+                {cartMessage}
+              </div>
+            )}
+
+            {/* Add to Cart Button */}
+            <button
+              onClick={handleAddToCart}
+              disabled={addingToCart}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-lg font-bold text-lg mb-4 hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {addingToCart ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  ĐANG THÊM...
+                </>
+              ) : (
+                <>🛒 THÊM VÀO GIỎ HÀNG</>
+              )}
+            </button>
+
+            {/* Book Now Button */}
             <button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-bold text-lg mb-4 hover:from-blue-600 hover:to-blue-700 transition-all">
-              ĐẶT TOUR
+              ⚡ ĐẶT NGAY
             </button>
 
             {/* Tabs for more details */}
@@ -533,6 +716,13 @@ export default function TourDetailPage({ params }: TourDetailPageProps) {
         isLoggedIn={isLoggedIn}
         userEmail={userEmail}
         onTokenExpired={handleTokenExpired}
+      />
+
+      {/* Cart Popup Component */}
+      <CartPopup
+        isOpen={showCartPopup}
+        onClose={() => setShowCartPopup(false)}
+        onCartUpdate={loadCartCount}
       />
 
       {/* Login Popup */}

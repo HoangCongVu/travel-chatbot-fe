@@ -4,7 +4,7 @@ import ChatManagementAdminComponent from "../chatManagementAdmin";
 export default function ChatsPage() {
   return (
     <AdminLayout>
-      <ChatManagementAdminComponent />
+      <ChatManagementAdminComponent userRole="admin" />
     </AdminLayout>
   );
 }

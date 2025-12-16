@@ -3,7 +3,15 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { tourServices } from "@/services/tourServices";
-import { ArrowLeftFromLine, Delete, ScanSearch, X } from "lucide-react";
+import { cartServices, cartStorage } from "@/services/cartServices";
+import CartPopup from "@/components/CartPopup";
+import {
+  ArrowLeftFromLine,
+  Delete,
+  ScanSearch,
+  X,
+  ShoppingCart,
+} from "lucide-react";
 
 // Define tour type based on actual API structure
 interface Tour {
@@ -66,6 +74,27 @@ export default function SearchPage() {
     departure: "Hồ Chí Minh",
     departureDate: "",
   });
+
+  const [showCartPopup, setShowCartPopup] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0);
+
+  // Load cart item count
+  const loadCartCount = async () => {
+    const cartId = cartStorage.getCartId();
+    if (!cartId) return;
+
+    try {
+      const total = await cartServices.getCartTotal(cartId);
+      setCartItemCount(total.total_items);
+    } catch (error) {
+      console.error("❌ Error loading cart count:", error);
+    }
+  };
+
+  // Load cart count on mount
+  useEffect(() => {
+    loadCartCount();
+  }, []);
 
   // Load filters from URL params
   useEffect(() => {
@@ -188,21 +217,98 @@ export default function SearchPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
+      {/* Header Navigation */}
       <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleBackToHome}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-colors cursor-pointer"
-              >
-                <ArrowLeftFromLine className="w-5 h-5" />
-                <span className="font-medium">Về trang chủ</span>
-              </button>
-              <div className="text-3xl font-bold">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
+            <div className="flex items-center">
+              <div className="text-4xl font-bold">
                 <span className="text-blue-500">Travel</span>
                 <span className="text-gray-700">AI</span>
               </div>
+            </div>
+
+            {/* Navigation */}
+            <nav className="hidden lg:flex items-center space-x-8">
+              <a
+                href="#"
+                className="text-gray-700 hover:text-blue-400 font-medium"
+              >
+                DU LỊCH
+              </a>
+              <a
+                href="#"
+                className="text-gray-700 hover:text-blue-400 font-medium"
+              >
+                VÉ MÁY BAY
+              </a>
+              <a
+                href="#"
+                className="text-gray-700 hover:text-blue-400 font-medium"
+              >
+                KHÁCH SẠN
+              </a>
+              <a
+                href="#"
+                className="text-gray-700 hover:text-blue-400 font-medium"
+              >
+                DỊCH VỤ LÀM VISA
+              </a>
+              <a
+                href="#"
+                className="text-gray-700 hover:text-blue-400 font-medium"
+              >
+                THUÊ XE
+              </a>
+              <a
+                href="#"
+                className="text-gray-700 hover:text-blue-400 font-medium"
+              >
+                TIN TỨC
+              </a>
+              <a
+                href="#"
+                className="text-gray-700 hover:text-blue-400 font-medium"
+              >
+                GIỚI THIỆU
+              </a>
+            </nav>
+
+            {/* Right side with Back button */}
+            <div className="flex items-center space-x-4">
+              {/* Cart Icon */}
+              <button
+                onClick={() => setShowCartPopup(true)}
+                className="relative flex items-center text-gray-700 space-x-1 hover:text-blue-400 cursor-pointer transition-colors"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
+                <span>Giỏ hàng</span>
+              </button>
+              <button
+                onClick={() => router.back()}
+                className="flex items-center text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                Quay lại
+              </button>
             </div>
           </div>
         </div>
@@ -614,6 +720,13 @@ export default function SearchPage() {
           </div>
         </div>
       </div>
+
+      {/* Cart Popup Component */}
+      <CartPopup
+        isOpen={showCartPopup}
+        onClose={() => setShowCartPopup(false)}
+        onCartUpdate={loadCartCount}
+      />
     </div>
   );
 }

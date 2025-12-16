@@ -4,11 +4,11 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { adminServices, tokenManager } from "@/services/adminServices";
 
-interface AdminLayoutProps {
+interface StaffLayoutProps {
   children: React.ReactNode;
 }
 
-export default function AdminLayout({ children }: AdminLayoutProps) {
+export default function StaffLayout({ children }: StaffLayoutProps) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -17,13 +17,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     const checkAuth = () => {
       const token = tokenManager.getToken();
       const userRole = localStorage.getItem("role"); // Changed from "user_role" to "role"
+      console.log("StaffLayout - token:", !!token, "role:", userRole);
       setLoading(false);
 
       if (!token) {
-        router.push("/admin/login");
-      } else if (userRole !== "admin") {
-        // If role is not admin, redirect to admin login
-        router.push("/admin/login");
+        router.push("/staff/login");
+      } else if (userRole !== "staff") {
+        // If role is not staff, redirect to staff login
+        router.push("/staff/login");
       }
     };
 
@@ -33,8 +34,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const handleLogout = () => {
     adminServices.logout();
     localStorage.removeItem("role"); // Changed from "user_role" to "role"
-    localStorage.setItem("admin_logout_success", "true");
-    router.push("/admin/login");
+    localStorage.setItem("staff_logout_success", "true");
+    router.push("/staff/login");
   };
 
   const isActive = (path: string) => {
@@ -61,11 +62,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <div className="flex items-center">
               <div className="text-4xl font-bold flex items-center gap-2">
                 <span className="text-blue-500">TravelAI</span>
-                <span className="text-gray-700">Admin</span>
+                <span className="text-gray-700">Staff</span>
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-xl text-gray-500">Welcome, Admin</span>
+              <span className="text-xl text-gray-500">Welcome, Staff</span>
               <button
                 onClick={handleLogout}
                 className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.03] transition-all cursor-pointer"
@@ -83,57 +84,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <div className="p-4">
             <nav className="space-y-2">
               <button
-                onClick={() => router.push("/admin/users")}
+                onClick={() => router.push("/staff/chats")}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/users")
-                    ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }`}
-              >
-                <svg
-                  className="w-5 h-5 mr-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-                  />
-                </svg>
-                User Management
-              </button>
-
-              <button
-                onClick={() => router.push("/admin/staff")}
-                className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/staff")
-                    ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                }`}
-              >
-                <svg
-                  className="w-5 h-5 mr-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                Staff Management
-              </button>
-
-              <button
-                onClick={() => router.push("/admin/chats")}
-                className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/chats")
+                  isActive("/staff/chats")
                     ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
@@ -155,9 +108,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </button>
 
               <button
-                onClick={() => router.push("/admin/tours")}
+                onClick={() => router.push("/staff/tours")}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/tours")
+                  isActive("/staff/tours")
                     ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
@@ -185,9 +138,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </button>
 
               <button
-                onClick={() => router.push("/admin/documents")}
+                onClick={() => router.push("/staff/documents")}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/documents")
+                  isActive("/staff/documents")
                     ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
@@ -209,9 +162,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </button>
 
               <button
-                onClick={() => router.push("/admin/settings")}
+                onClick={() => router.push("/staff/settings")}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/settings")
+                  isActive("/staff/settings")
                     ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
@@ -239,9 +192,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </button>
 
               <button
-                onClick={() => router.push("/admin/bookings")}
+                onClick={() => router.push("/staff/bookings")}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/bookings")
+                  isActive("/staff/bookings")
                     ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
@@ -263,9 +216,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </button>
 
               <button
-                onClick={() => router.push("/admin/payments")}
+                onClick={() => router.push("/staff/payments")}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-lg font-medium text-sm transition-colors cursor-pointer ${
-                  isActive("/admin/payments")
+                  isActive("/staff/payments")
                     ? "bg-blue-100 text-blue-700 border-l-4 border-blue-500"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
